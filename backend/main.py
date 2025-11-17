@@ -13,9 +13,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 # Routers
-from backend.ai.ai import router as ai_router
-from backend.parser.parser import router as parser_router
-from backend.memory import router as memory_router
+from backend.routers.ai import router as ai_router
+from backend.routers.parser import router as parser_router
+from backend.routers.memory import router as memory_router
 
 # Master engine
 from backend.ai.fallback_chain import intelligent_fallback
