@@ -41,6 +41,10 @@ def save_entry(entry):
     save_mem(mem)
     return {"status":"saved","memory":mem}
 
+def get_all_memory_entries():
+    # simple alias used by similarity module
+    return load_mem()
+
 def get_all():
     return load_mem()
 
