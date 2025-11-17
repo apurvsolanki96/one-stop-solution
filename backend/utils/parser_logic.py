@@ -1,8 +1,8 @@
 import re
-from utils.fl_utils import extract_flight_levels
-from utils.similarity import find_similar_memory
-from utils.confidence import score_output
-from utils.memory_engine import save_memory_entry
+from backend.utils.fl_utils import extract_flight_levels
+from backend.utils.similarity import find_similar_memory
+from backend.utils.confidence import score_output
+from backend.utils.memory_engine import save_memory_entry
 
 # Core full hybrid parser engine (compact version)
 
