@@ -42,8 +42,40 @@ def save_entry(entry):
     return {"status":"saved","memory":mem}
 
 def get_all_memory_entries():
-    # simple alias used by similarity module
+    """
+    Compatibility helper used by similarity module.
+
+    Returns the full in-memory structure loaded from the JSON file.
+    """
     return load_mem()
+
+
+def save_memory_entry(notam: str, aviation: dict):
+    """
+    Compatibility helper used by parser_logic.
+
+    Stores a single memory entry combining the raw NOTAM text and the
+    parsed aviation structure into the memory JSON file.
+    """
+    data = load_mem()
+
+    # Use a generic "entries" list so we don't break existing keys
+    entries = data.get("entries")
+    if entries is None:
+        entries = []
+    entries.append({
+        "notam": notam,
+        "aviation": aviation,
+    })
+    data["entries"] = entries
+
+    save_mem(data)
+
+    return {
+        "status": "saved",
+        "total_entries": len(entries),
+    }
+
 
 def get_all():
     return load_mem()
