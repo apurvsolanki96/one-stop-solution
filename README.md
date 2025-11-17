@@ -1,2 +1,1 @@
-# one-stop-solution
-awy notam processing
+# Placeholder README
