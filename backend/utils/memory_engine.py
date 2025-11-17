@@ -1,85 +1,63 @@
+import json
+from pathlib import Path
 
-# Batch 7E-5 — Memory Engine
-import json, os
-from difflib import SequenceMatcher
+# Where we store the memory JSON file (next to this script)
+BASE_DIR = Path(__file__).resolve().parent  # backend/utils
+MEM_FILE = BASE_DIR / "memory_store.json"
 
-BASE_PATH = os.path.dirname(__file__)
-MEM_FILE = os.path.join(BASE_PATH,"memory_store.json")
+DEFAULT_MEM = {"entries": []}
+
 
 def load_mem():
+    """Load memory data from JSON file, or return an empty structure."""
+    if not MEM_FILE.exists():
+        return DEFAULT_MEM.copy()
+
     try:
-        with open(MEM_FILE,"r") as f:
+        with MEM_FILE.open("r", encoding="utf-8") as f:
             return json.load(f)
-    except:
-        return {"fixes":{}, "segments":[]}
+    except Exception:
+        # If file is corrupt, fall back to empty
+        return DEFAULT_MEM.copy()
 
-def save_mem(data):
-    with open(MEM_FILE,"w") as f:
-        json.dump(data,f,indent=2)
 
-def memory_lookup(fix):
-    mem=load_mem()
-    fix=fix.upper()
-    if fix in mem.get("fixes",{}):
-        return mem["fixes"][fix]
-    # similarity search
-    for k,v in mem.get("fixes",{}).items():
-        if SequenceMatcher(None, fix, k).ratio()>0.8:
-            return v
-    return None
+def save_mem(data: dict):
+    """Save the memory data back to JSON."""
+    MEM_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with MEM_FILE.open("w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
 
-def save_entry(entry):
-    mem=load_mem()
-    # save fix corrections
-    for key,val in entry.get("fixes",{}).items():
-        mem.setdefault("fixes",{})[key.upper()] = val.upper()
-    # save segments
-    if "segments" in entry:
-        for seg in entry["segments"]:
-            if seg not in mem["segments"]:
-                mem["segments"].append(seg)
-    save_mem(mem)
-    return {"status":"saved","memory":mem}
 
 def get_all_memory_entries():
     """
-    Compatibility helper used by similarity module.
+    Used by similarity.py.
 
-    Returns the full in-memory structure loaded from the JSON file.
+    Returns the full memory structure, including the "entries" list.
     """
     return load_mem()
 
 
 def save_memory_entry(notam: str, aviation: dict):
     """
-    Compatibility helper used by parser_logic.
+    Used by parser_logic.py.
 
-    Stores a single memory entry combining the raw NOTAM text and the
-    parsed aviation structure into the memory JSON file.
+    Appends a single entry {notam, aviation} to the memory file.
     """
     data = load_mem()
-
-    # Use a generic "entries" list so we don't break existing keys
-    entries = data.get("entries")
-    if entries is None:
-        entries = []
+    entries = data.get("entries") or []
     entries.append({
         "notam": notam,
         "aviation": aviation,
     })
     data["entries"] = entries
-
     save_mem(data)
-
     return {
         "status": "saved",
         "total_entries": len(entries),
     }
 
 
-def get_all():
-    return load_mem()
-
 def clear_memory():
-    save_mem({"fixes":{}, "segments":[]})
-    return {"status":"cleared"}
+    """Reset the memory store."""
+    save_mem(DEFAULT_MEM.copy())
+    return {"status": "cleared"}
