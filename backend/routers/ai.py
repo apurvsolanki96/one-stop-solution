@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from ai_providers.openai_client import generate_openai
-from ai_providers.copilot_client import generate_copilot
+from backend.ai_providers.openai_client import generate_openai
+from backend.ai_providers.copilot_client import generate_copilot
 
 router = APIRouter(prefix="/ai", tags=["AI"])
 
