@@ -15,6 +15,19 @@ def meters_to_feet(m):
 def feet_to_fl(ft):
     return math.ceil(ft / 100)  # ROUND UP as per user choice
 
+def extract_flight_levels(text: str):
+    """
+    Compatibility wrapper used by parser_logic.
+
+    Returns:
+        (fl_min, fl_max) as integers, based on the full FL extraction.
+        Uses the lower FL and the final, Q-line–clamped upper FL.
+    """
+    info = extract_fl(text)
+    fl_min = info["fl_lower"]
+    fl_max = info["fl_upper_final"]
+    return fl_min, fl_max
+
 def extract_fl_from_FG(text):
     """
     Extracts F) lower and G) upper lines.
