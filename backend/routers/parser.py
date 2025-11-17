@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from utils.parser_logic import parse_notam_advanced
+from backend.utils.parser_logic import parse_notam_advanced
 
 router = APIRouter(prefix="/parse", tags=["Parser"])
 
