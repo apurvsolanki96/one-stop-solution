@@ -1,6 +1,6 @@
-
 import re
-from utils.memory_engine import get_all_memory_entries
+from backend.utils.memory_engine import get_all_memory_entries
+
 
 # tokenize for cosine-like similarity
 def tokenize(text):
