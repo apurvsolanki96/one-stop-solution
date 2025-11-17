@@ -9,3 +9,8 @@ backend/.env
 # Virtual envs
 venv/
 .venv/
+
+git add .gitignore
+git rm --cached backend/.env
+git commit -m "Remove secrets and ignore .env"
+git push
