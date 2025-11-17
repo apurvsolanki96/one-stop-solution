@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from utils.memory_engine import save_memory_entry
+from backend.utils.memory_engine import save_memory_entry
 
 router = APIRouter(prefix="/memory", tags=["Memory"])
 
