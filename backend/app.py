@@ -34,3 +34,9 @@ app.include_router(memory_router)
 async def health_check():
     return {"status":"ok","service":"one-stop-solution-backend"}
 
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, RedirectResponse
+
+# Mount docs directory at root (after routers so API routes keep precedence)
+app.mount("/", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "docs"), html=True), name="docs_static")
+
