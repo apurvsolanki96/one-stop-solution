@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ONE STOP SOLUTION – Flightscape NOTAM AI Processor</title>
+
+<link rel="stylesheet" href="styles.css" />
+<link rel="icon" type="image/png" href="assets/flightscape-logo.png" />
+</head>
+
+<body>
+
+<!-- DAY/NIGHT TOGGLE -->
+<button class="toggle-mode" onclick="toggleMode()">🌙/☀️</button>
+
+<!-- HEADER -->
+<div class="logo-bar">
+    <img src="assets/flightscape-logo.png" class="logo-img" alt="logo" />
+    <span class="logo-title">ONE STOP SOLUTION</span>
+</div>
+
+<!-- MAIN CONTAINER -->
+<div class="container">
+
+    <textarea id="notamBox" placeholder="Paste NOTAM here..."></textarea>
+
+    <div class="btn-row">
+        <button onclick="processNOTAM()">Process</button>
+        <button onclick="aiExplain()">Explain</button>
+        <button onclick="aiSimplify()">Simplify</button>
+        <button onclick="aiRisk()">Risk</button>
+      <!-- Offline parsing button added -->
+<button id="offlineParseBtn">Parse Offline</button>
+    </div>
+
+    <div class="memory-box">
+        <button onclick="saveToMemory()">Save to Memory</button>
+        <span id="memoryStatus">Memory: Idle</span>
+    </div>
+
+    <h3 class="out-title">OUTPUT</h3>
+
+    <div id="output"></div>
+    <span id="copyNotice" class="copy-notice"></span>
+</div>
+
+<script src="script.js"></script>
+
+<script src="offline-parser.js"></script>
+</body>
+</html>
