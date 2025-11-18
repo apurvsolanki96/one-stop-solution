@@ -1,49 +1,77 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>ONE STOP SOLUTION – Flightscape NOTAM AI Processor</title>
-
-<link rel="stylesheet" href="styles.css" />
-<link rel="icon" type="image/png" href="assets/flightscape-logo.png" />
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>NOTAM Parser — Offline (Tested)</title>
+<style>
+  :root{--bg:#f6f8fb;--card:#fff;--muted:#646f7a;--accent:#0b63ff}
+  body{font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;margin:18px;background:var(--bg);color:#0b1723}
+  .wrap{max-width:1100px;margin:0 auto}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  h1{font-size:18px;margin:0}
+  .desc{color:var(--muted);font-size:13px;margin-bottom:12px}
+  .card{background:var(--card);padding:14px;border-radius:10px;box-shadow:0 1px 0 rgba(0,0,0,0.04)}
+  textarea{width:100%;height:180px;font-family:ui-monospace, Menlo, Monaco, monospace; font-size:13px; padding:10px; border-radius:6px; border:1px solid #e6e9ef; resize:vertical}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  button{background:var(--accent);color:#fff;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
+  button.secondary{background:#eef4ff;color:#07306b}
+  table{width:100%;border-collapse:collapse;margin-top:12px}
+  th,td{border:1px solid #e8eef7;padding:8px;text-align:left;font-size:13px}
+  th{background:#fafcff}
+  .small{font-size:12px;color:var(--muted)}
+  .warn{background:#fff4f0;border-left:4px solid #ffb199;padding:10px;border-radius:6px;margin:10px 0}
+  .ok{background:#f3fff4;border-left:4px solid #79d27f;padding:10px;border-radius:6px;margin:10px 0}
+  .note{background:#fff8e6;border-left:4px solid #ffd66b;padding:10px;border-radius:6px;margin:10px 0}
+  footer{margin-top:14px;color:var(--muted);font-size:12px}
+  @media (max-width:720px){header{flex-direction:column;align-items:flex-start}}
+</style>
 </head>
-
 <body>
+  <div class="wrap">
+    <header>
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="24" height="24" rx="6" fill="#0b63ff"/>
+        <path d="M6 12L10 10L14 14L18 8" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div>
+        <h1>NOTAM Parser — Offline (Tested)</h1>
+        <div class="desc">Standalone browser tool. Load your file and run diagnostics. No network, no backend changes.</div>
+      </div>
+    </header>
 
-<!-- DAY/NIGHT TOGGLE -->
-<button class="toggle-mode" onclick="toggleMode()">🌙/☀️</button>
+    <div class="card">
+      <div class="small">This tool is offline-only. Keep it in a separate folder to avoid replacing your production index.html.</div>
 
-<!-- HEADER -->
-<div class="logo-bar">
-    <img src="assets/flightscape-logo.png" class="logo-img" alt="logo" />
-    <span class="logo-title">ONE STOP SOLUTION</span>
-</div>
+      <div style="margin-top:10px">
+        <textarea id="input" placeholder="(Optional) paste specific NOTAMs you want to test or edit them after load"></textarea>
+      </div>
 
-<!-- MAIN CONTAINER -->
-<div class="container">
+      <div class="controls">
+        <button id="parse">Parse Current Text</button>
+        <button id="clear" class="secondary">Clear</button>
+        <button id="export" class="secondary">Export CSV</button>
+        <label style="display:inline-flex;align-items:center;gap:8px">
+          <input id="file" type="file" accept=".txt" />
+          <span class="small">Load .txt</span>
+        </label>
+        <button id="runAll" class="secondary">Parse & Run Diagnostics on Loaded File</button>
+        <button id="sample" class="secondary">Load Demo Samples</button>
+      </div>
 
-    <textarea id="notamBox" placeholder="Paste NOTAM here..."></textarea>
+      <div id="summary" style="margin-top:12px"></div>
+      <div id="result" style="margin-top:12px"></div>
 
-    <div class="btn-row">
-        <button onclick="processNOTAM()">Process</button>
-        <button onclick="aiExplain()">Explain</button>
-        <button onclick="aiSimplify()">Simplify</button>
-        <button onclick="aiRisk()">Risk</button>
+      <div class="note">
+        <strong>How this helps you:</strong> After loading your `THE AWY OUTPUT ONLY.TXT`, click <em>Parse & Run Diagnostics on Loaded File</em>. The tool will attempt to parse every example and report which items were parsed cleanly and which need improved rules. Copy any failing examples and paste them here — I'll update the parser.
+      </div>
+
+      <footer>
+        Tip: Keep this folder separate from your deployment. If you want me to harden the parser to exact lines, paste failing lines here and I’ll update the parser file.
+      </footer>
     </div>
+  </div>
 
-    <div class="memory-box">
-        <button onclick="saveToMemory()">Save to Memory</button>
-        <span id="memoryStatus">Memory: Idle</span>
-    </div>
-
-    <h3 class="out-title">OUTPUT</h3>
-
-    <div id="output"></div>
-    <span id="copyNotice" class="copy-notice"></span>
-</div>
-
-<script src="script.js"></script>
-
+<script src="notam-parser-tested.js"></script>
 </body>
 </html>
