@@ -7,7 +7,7 @@ load_dotenv()  # loads .env for local development
 # Correct names that match Render.com
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 COPILOT_API_KEY = os.getenv("COPILOT_API_KEY")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")  # default model
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1")  # default model
 
 if not OPENAI_API_KEY:
     print("⚠️ WARNING: OPENAI_API_KEY is missing!")
