@@ -1,47 +1,79 @@
 # backend/utils/memory_engine.py
-import json
+"""
+File-backed memory engine for NOTAM memory.
+Provides a small, stable API used across the app.
+
+Exports:
+ - get_all() -> dict  (current store)
+ - get_all_memory_entries() -> list (compat alias for older callers)
+ - save_entry(data) -> dict (API-facing save)
+ - save_memory_entry(notam, aviation) -> dict (lower-level)
+ - memory_learn(notam, aviation) -> dict
+ - clear_memory() -> dict
+"""
+
 from pathlib import Path
-from typing import Any, Dict, List
+import json
 import threading
 import datetime
+from typing import Any, Dict, List
 
 BASE_DIR = Path(__file__).resolve().parent
 MEM_FILE = BASE_DIR / "memory_store.json"
 _LOCK = threading.Lock()
 
-DEFAULT_MEM: Dict[str, Any] = {"entries": []}
+_DEFAULT_MEM: Dict[str, Any] = {"entries": []}
 
-def load_mem() -> Dict[str, Any]:
-    """Return the memory dict or default structure."""
+
+def _read_file() -> Dict[str, Any]:
+    """Load memory JSON; return a dict with 'entries' list."""
     if not MEM_FILE.exists():
-        return DEFAULT_MEM.copy()
+        return _DEFAULT_MEM.copy()
     try:
         with MEM_FILE.open("r", encoding="utf-8") as fh:
             data = json.load(fh)
             if not isinstance(data, dict):
-                return DEFAULT_MEM.copy()
+                return _DEFAULT_MEM.copy()
             if "entries" not in data:
                 data["entries"] = []
             return data
     except Exception:
-        return DEFAULT_MEM.copy()
+        # On any error return the default structure
+        return _DEFAULT_MEM.copy()
 
-def save_mem(data: Dict[str, Any]) -> None:
-    """Write JSON atomically."""
+
+def _write_file(data: Dict[str, Any]) -> None:
+    """Atomically write memory JSON to disk."""
     MEM_FILE.parent.mkdir(parents=True, exist_ok=True)
     tmp = MEM_FILE.with_suffix(".tmp")
     with tmp.open("w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=2, ensure_ascii=False)
     tmp.replace(MEM_FILE)
 
+
 def get_all() -> Dict[str, Any]:
-    """Return the whole memory store."""
-    return load_mem()
+    """
+    Return the full memory store as a dict: {"entries": [...]}
+    """
+    return _read_file()
+
+
+def get_all_memory_entries() -> List[Dict[str, Any]]:
+    """
+    Compatibility function expected by other modules.
+    Returns the list of entries only.
+    """
+    data = _read_file()
+    return data.get("entries", [])
+
 
 def save_memory_entry(notam: str, aviation: Dict[str, Any]) -> Dict[str, Any]:
-    """Append an entry and persist it."""
-    mem = load_mem()
-    entries: List[Dict[str, Any]] = mem.get("entries", [])
+    """
+    Add a memory entry and persist. Returns saved entry in a response dict.
+    """
+    mem = _read_file()
+    entries: List[Dict[str, Any]] = mem.get("entries", []) or []
+    # compute new id (simple incremental)
     entry_id = (entries[-1]["id"] + 1) if entries else 1
     entry = {
         "id": entry_id,
@@ -52,11 +84,14 @@ def save_memory_entry(notam: str, aviation: Dict[str, Any]) -> Dict[str, Any]:
     entries.append(entry)
     mem["entries"] = entries
     with _LOCK:
-        save_mem(mem)
+        _write_file(mem)
     return {"status": "saved", "entry": entry}
 
+
 def save_entry(data: Any) -> Dict[str, Any]:
-    """API-friendly wrapper. Accepts dict or string."""
+    """
+    API-level wrapper used by routes. Accepts dict or string payload.
+    """
     if data is None:
         return {"error": "no data provided"}
     if isinstance(data, str):
@@ -67,15 +102,22 @@ def save_entry(data: Any) -> Dict[str, Any]:
     aviation = data.get("aviation") or {}
     return save_memory_entry(notam, aviation)
 
+
 def memory_learn(notam: str = "", aviation: Dict[str, Any] = None) -> Dict[str, Any]:
-    if notam is None:
-        notam = ""
+    """
+    Convenience wrapper to save a memory entry.
+    """
     if aviation is None:
         aviation = {}
-    return save_memory_entry(notam, aviation)
+    return save_memory_entry(notam or "", aviation)
+
 
 def clear_memory() -> Dict[str, Any]:
     """Reset store to default."""
     with _LOCK:
-        save_mem(DEFAULT_MEM.copy())
+        _write_file(_DEFAULT_MEM.copy())
     return {"status": "cleared"}
+
+
+# Aliases for compatibility (if elsewhere code imports different names)
+get_all_entries = get_all_memory_entries
