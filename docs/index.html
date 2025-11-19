@@ -45,8 +45,12 @@
     <span id="copyNotice" class="copy-notice"></span>
 </div>
 
-<script src="script.js"></script>
+  <!-- load offline parser first so it registers window.offlineProcess -->
+  <script src="/offline-parser.js"></script>
+  <!-- then load the main UI script that uses callAPI and offlineProcess -->
+  <script src="/script.js"></script>
+</body>
+</html>
 
-<script src="offline-parser.js"></script>
 </body>
 </html>
