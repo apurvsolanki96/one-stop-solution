@@ -1,123 +1,54 @@
-# backend/utils/memory_engine.py
-"""
-File-backed memory engine for NOTAM memory.
-Provides a small, stable API used across the app.
+def memory_lookup_fix(code: str):
+    """
+    Compatibility helper expected by fix_validator / other modules.
+    Given a fix/waypoint/code string (e.g. 'KRD' or 'GITOV'), return the
+    first matching memory entry dict where the fix appears.
 
-Exports:
- - get_all() -> dict  (current store)
- - get_all_memory_entries() -> list (compat alias for older callers)
- - save_entry(data) -> dict (API-facing save)
- - save_memory_entry(notam, aviation) -> dict (lower-level)
- - memory_learn(notam, aviation) -> dict
- - clear_memory() -> dict
-"""
+    Matching rules (in order):
+      - exact match against aviation['fix'] if present
+      - exact match against aviation codes inside aviation dict (any value)
+      - substring match inside the 'notam' text
+      - substring match inside the 'aviation' fields when serialized
 
-from pathlib import Path
-import json
-import threading
-import datetime
-from typing import Any, Dict, List
-
-BASE_DIR = Path(__file__).resolve().parent
-MEM_FILE = BASE_DIR / "memory_store.json"
-_LOCK = threading.Lock()
-
-_DEFAULT_MEM: Dict[str, Any] = {"entries": []}
-
-
-def _read_file() -> Dict[str, Any]:
-    """Load memory JSON; return a dict with 'entries' list."""
-    if not MEM_FILE.exists():
-        return _DEFAULT_MEM.copy()
+    Returns the entry dict or None when no match found.
+    """
+    if not code:
+        return None
     try:
-        with MEM_FILE.open("r", encoding="utf-8") as fh:
-            data = json.load(fh)
-            if not isinstance(data, dict):
-                return _DEFAULT_MEM.copy()
-            if "entries" not in data:
-                data["entries"] = []
-            return data
+        needle = str(code).strip().upper()
+        entries = get_all_memory_entries()
+        for e in entries:
+            # check structured aviation keys first
+            aviation = e.get("aviation") or {}
+            # If 'fix' is a dedicated key, check it
+            fix_val = aviation.get("fix") or aviation.get("icao") or aviation.get("code")
+            if isinstance(fix_val, str) and fix_val.upper() == needle:
+                return e
+            # check any aviation values for exact token match
+            for v in aviation.values():
+                if isinstance(v, str) and v.upper() == needle:
+                    return e
+                # if it's list-like, check elements
+                if isinstance(v, (list, tuple)):
+                    for item in v:
+                        if isinstance(item, str) and item.upper() == needle:
+                            return e
+            # fallback: substring match in notam or aviation serialized
+            notam_text = (e.get("notam") or "").upper()
+            if needle in notam_text:
+                return e
+            try:
+                # small, cheap serialization check
+                avi_ser = json.dumps(aviation).upper()
+                if needle in avi_ser:
+                    return e
+            except Exception:
+                pass
+        return None
     except Exception:
-        # On any error return the default structure
-        return _DEFAULT_MEM.copy()
+        # Never bubble an exception here; return None on failure
+        return None
 
 
-def _write_file(data: Dict[str, Any]) -> None:
-    """Atomically write memory JSON to disk."""
-    MEM_FILE.parent.mkdir(parents=True, exist_ok=True)
-    tmp = MEM_FILE.with_suffix(".tmp")
-    with tmp.open("w", encoding="utf-8") as fh:
-        json.dump(data, fh, indent=2, ensure_ascii=False)
-    tmp.replace(MEM_FILE)
-
-
-def get_all() -> Dict[str, Any]:
-    """
-    Return the full memory store as a dict: {"entries": [...]}
-    """
-    return _read_file()
-
-
-def get_all_memory_entries() -> List[Dict[str, Any]]:
-    """
-    Compatibility function expected by other modules.
-    Returns the list of entries only.
-    """
-    data = _read_file()
-    return data.get("entries", [])
-
-
-def save_memory_entry(notam: str, aviation: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Add a memory entry and persist. Returns saved entry in a response dict.
-    """
-    mem = _read_file()
-    entries: List[Dict[str, Any]] = mem.get("entries", []) or []
-    # compute new id (simple incremental)
-    entry_id = (entries[-1]["id"] + 1) if entries else 1
-    entry = {
-        "id": entry_id,
-        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
-        "notam": notam or "",
-        "aviation": aviation or {}
-    }
-    entries.append(entry)
-    mem["entries"] = entries
-    with _LOCK:
-        _write_file(mem)
-    return {"status": "saved", "entry": entry}
-
-
-def save_entry(data: Any) -> Dict[str, Any]:
-    """
-    API-level wrapper used by routes. Accepts dict or string payload.
-    """
-    if data is None:
-        return {"error": "no data provided"}
-    if isinstance(data, str):
-        return save_memory_entry(data, {})
-    if not isinstance(data, dict):
-        return {"error": "invalid payload"}
-    notam = data.get("notam") or data.get("text") or ""
-    aviation = data.get("aviation") or {}
-    return save_memory_entry(notam, aviation)
-
-
-def memory_learn(notam: str = "", aviation: Dict[str, Any] = None) -> Dict[str, Any]:
-    """
-    Convenience wrapper to save a memory entry.
-    """
-    if aviation is None:
-        aviation = {}
-    return save_memory_entry(notam or "", aviation)
-
-
-def clear_memory() -> Dict[str, Any]:
-    """Reset store to default."""
-    with _LOCK:
-        _write_file(_DEFAULT_MEM.copy())
-    return {"status": "cleared"}
-
-
-# Aliases for compatibility (if elsewhere code imports different names)
-get_all_entries = get_all_memory_entries
+# keep older alias names for compatibility if used elsewhere
+memory_find_fix = memory_lookup_fix
