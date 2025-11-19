@@ -63,3 +63,80 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+// docs/script.js additions (append at end)
+document.addEventListener('DOMContentLoaded', function () {
+  // ensure parse offline button works
+  const offlineBtn = document.getElementById('offlineParseBtn');
+  const notamBox = document.getElementById('notamBox');
+  const outEl = document.getElementById('output') || document.querySelector('.output');
+
+  if (offlineBtn) {
+    offlineBtn.addEventListener('click', function () {
+      const text = (notamBox && notamBox.value) ? notamBox.value : '';
+      if (typeof window.offlineProcess === 'function') {
+        const res = window.offlineProcess(text);
+        if (res && res.output) {
+          if (outEl) outEl.textContent = res.output;
+          else console.log(res.output);
+        } else {
+          if (outEl) outEl.textContent = 'Offline parser returned no output';
+        }
+      } else {
+        if (outEl) outEl.textContent = 'Offline parser not available';
+      }
+    });
+  }
+
+  // Save to memory: POST to /memory/save, fallback to localStorage
+  const saveBtn = document.getElementById('saveMemoryBtn');
+  const memoryStatus = document.getElementById('memoryStatus');
+
+  async function saveToMemory(notamText) {
+    if (memoryStatus) memoryStatus.textContent = 'Memory: Saving...';
+    const payload = { notam: notamText || "" };
+    try {
+      const resp = await fetch('/memory/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (memoryStatus) memoryStatus.textContent = 'Memory: Saved (server)';
+        return data;
+      } else {
+        const txt = await resp.text();
+        throw new Error('Server error: ' + resp.status + ' ' + txt);
+      }
+    } catch (err) {
+      // fallback: save to localStorage
+      try {
+        const key = 'offline_memory_entries';
+        const raw = localStorage.getItem(key);
+        const arr = raw ? JSON.parse(raw) : [];
+        const id = arr.length ? arr[arr.length - 1].id + 1 : 1;
+        const entry = { id, timestamp: new Date().toISOString(), notam: notamText || "" };
+        arr.push(entry);
+        localStorage.setItem(key, JSON.stringify(arr));
+        if (memoryStatus) memoryStatus.textContent = 'Memory: Saved (local)';
+        return { status: 'saved_local', entry };
+      } catch (le) {
+        if (memoryStatus) memoryStatus.textContent = 'Memory: Failed';
+        throw le;
+      }
+    }
+  }
+
+  if (saveBtn) {
+    saveBtn.addEventListener('click', async function () {
+      const text = (notamBox && notamBox.value) ? notamBox.value : '';
+      try {
+        const res = await saveToMemory(text);
+        console.log('saveToMemory result', res);
+      } catch (e) {
+        console.error('Save failed', e);
+        if (memoryStatus) memoryStatus.textContent = 'Memory: Failed';
+      }
+    });
+  }
+});
