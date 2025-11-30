@@ -1,21 +1,19 @@
-<!-- File: one-stop-solution/docs/index.html -->
+<!-- File: one-stop-solution/docs/index.html (REPLACE) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>ONE STOP SOLUTION – Flightscape NOTAM AI Processor</title>
-
-  <!-- Keep your existing site stylesheet filename -->
   <link rel="stylesheet" href="styles.css" />
   <link rel="icon" type="image/png" href="assets/flightscape-logo.png" />
 </head>
 <body>
 
-  <!-- Day/Night Toggle — keep onclick for backward compatibility and id for script.js -->
-  <button id="btnThemeToggle" class="toggle-mode" onclick="toggleMode()">🌙/☀️</button>
+  <!-- Day/Night Toggle (top-right) -->
+  <button id="btnThemeToggle" class="toggle-mode" onclick="toggleMode()">Light</button>
 
-  <!-- HEADER (unchanged layout) -->
+  <!-- HEADER -->
   <div class="logo-bar">
     <img src="assets/flightscape-logo.png" class="logo-img" alt="logo" />
     <span class="logo-title">ONE STOP SOLUTION</span>
@@ -27,8 +25,8 @@
     <!-- NOTAM INPUT -->
     <textarea id="notamInput" class="input-box" placeholder="Paste NOTAM here..."></textarea>
 
-    <!-- BUTTON ROW: keep classes so CSS styles them -->
-    <div class="btn-row">
+    <!-- BUTTON ROW -->
+    <div class="btn-row controls">
       <button id="btnProcess" class="btn primary-btn" onclick="processNOTAM()">Process</button>
       <button id="btnExplain" class="btn secondary-btn" onclick="aiExplain()">Explain</button>
       <button id="btnSimplify" class="btn secondary-btn" onclick="aiSimplify()">Simplify</button>
@@ -49,26 +47,13 @@
     <span id="copyNotice" class="copy-notice"></span>
   </div>
 
-  <!-- SCRIPTS: offline parser must load before main script -->
+  <!-- Admin floating button -->
+  <button id="memoryAdminBtn" title="Open Memory Admin" style="position:fixed; right:14px; bottom:14px; z-index:9999; padding:10px 12px; border-radius:8px; background:#3f2ee6; color:white; border:none; cursor:pointer;">Memory</button>
+
+  <!-- Modal container for admin (created dynamically by script if needed) -->
+
+  <!-- Scripts: offline-parser.js must be first -->
   <script src="offline-parser.js"></script>
   <script src="script.js"></script>
-
-  <!-- Small wiring: Parse Offline button -> force offline parse -->
-  <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      const offlineBtn = document.getElementById('btnParseOffline');
-      if (offlineBtn) {
-        offlineBtn.addEventListener('click', function () {
-          if (window.oss && typeof window.oss.parseNow === 'function') {
-            window.oss.parseNow(true); // force offline-only
-            return;
-          }
-          // fallback
-          if (typeof processNOTAM === 'function') processNOTAM();
-          else alert('Parser not ready yet — try again in a second.');
-        });
-      }
-    });
-  </script>
 </body>
 </html>
