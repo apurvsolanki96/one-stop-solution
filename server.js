@@ -1,6 +1,7 @@
-// server.js
-// Single-file Express server that supports OpenAI project keys (sk-proj-...) and classic keys.
-// Serves docs/ static UI and exposes POST /process-notam -> { segments: [ ... ] }
+// File: server.js
+// Drop-in Express server for one-stop-solution
+// Supports OpenAI project keys (sk-proj-...) and classic keys (sk-...)
+// Serves docs/ static site and exposes POST /process-notam
 
 const express = require('express');
 const path = require('path');
@@ -8,152 +9,141 @@ const cors = require('cors');
 const OpenAI = require('openai');
 
 const app = express();
-app.use(express.json({ limit: '64kb' })); // small request bodies
-app.use(cors()); // allow all origins; lock down if needed
+app.use(express.json({ limit: '128kb' }));
+app.use(cors());
 
 const PORT = process.env.PORT || 3000;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
-const OPENAI_PROJECT_ID = process.env.OPENAI_PROJECT_ID || '';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ''; // must be set in Render
+// If env var not set, use the project id you provided here as default project id.
+// (This value is safe to include because it's not a secret token.)
+const DEFAULT_PROJECT_ID = 'proj_tA0t9qXJIq2KYNl5vPrjKrpF';
+const OPENAI_PROJECT_ID = process.env.OPENAI_PROJECT_ID || DEFAULT_PROJECT_ID;
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4.1';
-if (!OPENAI_API_KEY) {
-  console.error('ERROR: OPENAI_API_KEY environment variable is missing. Set it in Render or your environment.');
-  // Do not exit — server still serves static UI to allow offline testing. But endpoint will fail.
-}
 
-let openaiClient;
+// Initialize OpenAI client
+let openaiClient = null;
 try {
-  // Initialize client with apiKey and optional project (handles sk-proj keys)
+  if (!OPENAI_API_KEY) {
+    console.warn('WARN: OPENAI_API_KEY is not set. /process-notam will return 500 until you set a valid key.');
+  }
   openaiClient = new OpenAI({
-    apiKey: OPENAI_API_KEY,
+    apiKey: OPENAI_API_KEY || undefined,
     project: OPENAI_PROJECT_ID || undefined
   });
-  console.info('OpenAI client initialized. Project mode:', !!(OPENAI_API_KEY && (OPENAI_API_KEY.startsWith('sk-proj-') || OPENAI_PROJECT_ID)));
+  console.info('OpenAI client initialized. Project-id present:', !!OPENAI_PROJECT_ID);
 } catch (err) {
-  console.error('OpenAI client initialization failed:', err && err.message);
+  console.error('Failed to initialize OpenAI client:', err && err.message);
+  openaiClient = null;
 }
 
-// Serve static UI from docs/
+// Serve static frontend from docs/
 const docsPath = path.join(__dirname, 'docs');
 app.use(express.static(docsPath));
 
-// Basic health check
-app.get('/healthz', (req, res) => res.json({ ok: true }));
+// Basic healthcheck
+app.get('/healthz', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
-/**
- * Helper: try parse JSON -> { segments: [...] } or extract lines heuristically.
- */
+// Utility: extract segments from model output
 function extractSegmentsFromText(text) {
   if (!text) return [];
   text = String(text).trim();
-  // Try JSON
+  // Try JSON first
   try {
     const parsed = JSON.parse(text);
-    if (parsed && Array.isArray(parsed.segments)) return parsed.segments;
-    // If parsed has output_text, maybe model returned { output_text: "..." }
-    if (parsed && typeof parsed.output_text === 'string') {
-      // fallthrough to split
-      text = parsed.output_text;
-    } else {
-      // no segments
-    }
+    if (parsed && Array.isArray(parsed.segments)) return parsed.segments.map(s => String(s).trim()).filter(Boolean);
+    // Some models return object with output_text
+    if (parsed && typeof parsed.output_text === 'string') text = parsed.output_text;
   } catch (e) {
-    // not JSON
+    // ignore JSON error
   }
-  // Split lines and return non-empty
+  // Fallback: split into non-empty lines, filter out obvious labels
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-  // Heuristic: sometimes model includes "O/P:" or "OUTPUT:" header; remove those lines
-  const cleaned = lines.filter(l => !/^(\[?output\]?:?|\(?o\/p\)?:?)/i.test(l));
-  return cleaned;
+  const filtered = lines.filter(l => !/^(\[?output\]?:?|\(?o\/p\)?:?)/i.test(l));
+  // dedupe preserving order
+  const seen = new Set();
+  const out = [];
+  for (const l of filtered) {
+    if (!seen.has(l)) { seen.add(l); out.push(l); }
+  }
+  return out;
 }
 
-/**
- * POST /process-notam
- * Body: { notam: "<text>" }
- * Response: { segments: [ ... ] }
- */
+// POST /process-notam
+// Request: { notam: "..." }
+// Response: { segments: ["W187 TUSLI-DNH FL000-FL341", ...] }
 app.post('/process-notam', async (req, res) => {
   try {
-    const notam = (req.body && req.body.notam) ? String(req.body.notam) : '';
-    if (!notam || !notam.trim()) {
-      return res.status(400).json({ error: 'missing notam in request body' });
-    }
+    const notam = req.body && req.body.notam ? String(req.body.notam).trim() : '';
+    if (!notam) return res.status(400).json({ error: 'missing notam in request body' });
 
     if (!openaiClient) {
       return res.status(500).json({ error: 'OpenAI client not configured on server (missing OPENAI_API_KEY).' });
     }
 
-    // Instruction: ask model to return strict JSON: {"segments":["..."]}
-    const systemInstruction = `You are a strict extractor. Given NOTAM text, return ONLY valid JSON exactly in this format:
-{"segments":["AWY ... FLnnn-FLnnn", "..."]}
+    // Instruction to model: output strict JSON when possible
+    const systemInstruction = `You are an extractor. Given NOTAM text, output ONLY valid JSON in exactly this shape:
+{"segments":["<AWY> <FROM>-<TO> FLnnn-FLnnn", "..."]}
 If nothing found, return {"segments":[]} and nothing else.`;
 
     const userPrompt = `NOTAM:\n${notam}\n\nReturn only JSON as described.`;
 
-    // If project key or explicit project id -> use Responses API (new Projects API)
-    const isProjectKey = Boolean(OPENAI_API_KEY && OPENAI_API_KEY.startsWith('sk-proj-')) || !!OPENAI_PROJECT_ID;
-
+    // Determine if we should use Responses API (project keys) or Chat (classic)
+    const isProjectKey = Boolean(OPENAI_API_KEY && OPENAI_API_KEY.startsWith('sk-proj-')) || Boolean(OPENAI_PROJECT_ID);
     if (isProjectKey) {
-      // Responses API
       try {
-        const resp = await openaiClient.responses.create({
+        const response = await openaiClient.responses.create({
           model: MODEL,
           input: `${systemInstruction}\n\n${userPrompt}`,
-          // optionally adjust response settings: max_output_tokens, temperature
+          // optionally: max_output_tokens, temperature: 0
         });
 
-        // Try to obtain text: prefer resp.output_text; fallback to scanning output array
+        // Try to get text from response.output_text or response.output
         let outText = '';
-        if (resp.output_text) outText = String(resp.output_text);
-        else if (Array.isArray(resp.output)) {
-          // Try to extract output_text chunks
-          for (const o of resp.output) {
-            if (o.type === 'output_text' && typeof o.text === 'string') outText += o.text + '\n';
-            else if (o.type === 'message' && o.content) {
-              for (const c of (o.content || [])) {
+        if (response.output_text) {
+          outText = String(response.output_text);
+        } else if (Array.isArray(response.output) && response.output.length) {
+          // assemble text fragments
+          for (const chunk of response.output) {
+            if (chunk.type === 'output_text' && typeof chunk.text === 'string') outText += chunk.text + '\n';
+            if (chunk.type === 'message' && Array.isArray(chunk.content)) {
+              for (const c of chunk.content) {
                 if (c.type === 'output_text' && c.text) outText += c.text + '\n';
               }
             }
           }
+          outText = outText.trim();
         } else {
-          // Fallback: try JSON.stringify resp
-          outText = resp.output_text || JSON.stringify(resp).slice(0, 4000);
+          // fallback stringification
+          outText = response.output_text || JSON.stringify(response).slice(0, 3000);
         }
 
         const segments = extractSegmentsFromText(outText);
         return res.json({ segments });
       } catch (err) {
-        console.error('OpenAI Responses API error:', err && err.message);
-        // include trimmed error in response for debugging (don't leak secrets)
-        return res.status(500).json({ error: 'OpenAI Responses API error: ' + (err && err.message) });
+        console.error('OpenAI Responses API error:', err && (err.message || err.toString()));
+        return res.status(500).json({ error: 'OpenAI Responses API error: ' + (err && err.message || 'unknown') });
       }
     }
 
-    // Else classic (chat) key path — use Chat Completions (older path)
+    // Classic key path: try chat completions (older SDK shape)
     try {
-      // Many versions of the SDK use different method names; the OpenAI official Node SDK exposes:
-      // client.chat.completions.create({ ... })
-      // We attempt to call chat.completions.create and fallback to other shapes if necessary.
-      let chatResult;
+      // Some SDK versions expose chat.completions.create
       if (openaiClient.chat && openaiClient.chat.completions && typeof openaiClient.chat.completions.create === 'function') {
-        chatResult = await openaiClient.chat.completions.create({
+        const chat = await openaiClient.chat.completions.create({
           model: MODEL,
           messages: [
             { role: 'system', content: systemInstruction },
             { role: 'user', content: userPrompt }
           ],
           max_tokens: 800,
+          temperature: 0.0
         });
-        // get text
-        const choice = (chatResult.choices && chatResult.choices[0]) || null;
-        const chatText = choice && choice.message && choice.message.content
-          ? choice.message.content
-          : (choice && choice.text ? choice.text : '');
-        const segments = extractSegmentsFromText(chatText);
+        const choice = (chat.choices && chat.choices[0]) || null;
+        const text = choice && choice.message && choice.message.content ? String(choice.message.content) : (choice && choice.text ? String(choice.text) : '');
+        const segments = extractSegmentsFromText(text);
         return res.json({ segments });
       } else {
-        // If SDK doesn't have chat.completions, try legacy completions (as last fallback)
-        console.warn('chat.completions.create not found on openai client; attempting fallback.');
-        // Try to call `client.responses.create` as fallback (some SDK versions still support)
+        // Fallback: try responses.create as last resort
         const fallback = await openaiClient.responses.create({
           model: MODEL,
           input: `${systemInstruction}\n\n${userPrompt}`
@@ -163,17 +153,17 @@ If nothing found, return {"segments":[]} and nothing else.`;
         return res.json({ segments });
       }
     } catch (err) {
-      console.error('OpenAI Chat API error:', err && err.message);
-      return res.status(500).json({ error: 'OpenAI Chat API error: ' + (err && err.message) });
+      console.error('OpenAI Chat API error:', err && (err.message || err.toString()));
+      return res.status(500).json({ error: 'OpenAI Chat API error: ' + (err && err.message || 'unknown') });
     }
 
   } catch (err) {
-    console.error('Unexpected /process-notam error:', err && err.stack ? err.stack : err);
-    res.status(500).json({ error: 'server error' });
+    console.error('Unexpected error in /process-notam:', err && (err.stack || err.message || err));
+    return res.status(500).json({ error: 'server error' });
   }
 });
 
-// Fallback route: serve index if path not found (for SPA)
+// SPA fallback: serve index.html for any other route (keeps front-end routing safe)
 app.get('*', (req, res) => {
   res.sendFile(path.join(docsPath, 'index.html'));
 });
