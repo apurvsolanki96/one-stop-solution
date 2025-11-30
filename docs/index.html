@@ -11,10 +11,10 @@
 
 <body>
 
-<!-- DAY/NIGHT TOGGLE -->
+<!-- DAY/NIGHT TOGGLE (unchanged) -->
 <button class="toggle-mode" onclick="toggleMode()">🌙/☀️</button>
 
-<!-- HEADER -->
+<!-- HEADER (unchanged) -->
 <div class="logo-bar">
     <img src="assets/flightscape-logo.png" class="logo-img" alt="logo" />
     <span class="logo-title">ONE STOP SOLUTION</span>
@@ -23,35 +23,39 @@
 <!-- MAIN CONTAINER -->
 <div class="container">
 
-    <textarea id="notamBox" placeholder="Paste NOTAM here..."></textarea>
+    <!-- NOTAM INPUT BOX (ID changed for JS compatibility) -->
+    <textarea id="notamInput" placeholder="Paste NOTAM here..."></textarea>
 
+    <!-- BUTTON ROW (unchanged styling, fixed IDs for new JS) -->
     <div class="btn-row">
         <button onclick="processNOTAM()">Process</button>
         <button onclick="aiExplain()">Explain</button>
         <button onclick="aiSimplify()">Simplify</button>
         <button onclick="aiRisk()">Risk</button>
-      <!-- Offline parsing button added -->
-<button id="offlineParseBtn">Parse Offline</button>
+        
+        <!-- Offline parsing button (fixed ID name) -->
+        <button id="btnParseOffline">Parse Offline</button>
     </div>
 
+    <!-- MEMORY CONTROLS (fixed IDs) -->
     <div class="memory-box">
-<button id="saveMemoryBtn" class="btn">Save to Memory</button>
-<span id="memoryStatus">Memory: idle</span>
-
+        <button id="btnSaveMemory" class="btn">Save to Memory</button>
+        <span id="memoryBadge">Memory: idle</span>
     </div>
 
     <h3 class="out-title">OUTPUT</h3>
 
-    <div id="output"></div>
+    <!-- OUTPUT BOX (fixed ID name for JS) -->
+    <pre id="notamOutput" class="output-box"></pre>
+
     <span id="copyNotice" class="copy-notice"></span>
 </div>
 
-  <!-- load offline parser first so it registers window.offlineProcess -->
-  <script src="/offline-parser.js"></script>
-  <!-- then load the main UI script that uses callAPI and offlineProcess -->
-  <script src="/script.js"></script>
-</body>
-</html>
+<!-- Load Offline Parser FIRST -->
+<script src="offline-parser.js"></script>
+
+<!-- Load Main UI Script AFTER Parser -->
+<script src="script.js"></script>
 
 </body>
 </html>
