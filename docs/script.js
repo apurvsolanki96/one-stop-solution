@@ -119,6 +119,14 @@
       });
     }
     window.oss = { parseNow: parseNotamFlow, memoryList: loadMemory, addMemory: addMemoryRecord };
+    // --- Backwards-compatible global functions for existing HTML buttons ---
+window.toggleMode = toggleTheme;                 // original toggle button: toggleMode()
+window.processNOTAM = () => parseNotamFlow(false); // original Process button: processNOTAM()
+window.aiExplain = () => parseNotamFlow(false);    // Explain -> use same pipeline (adjust later)
+window.aiSimplify = () => parseNotamFlow(false);   // Simplify -> same pipeline
+window.aiRisk = () => parseNotamFlow(false);       // Risk -> same pipeline
+// --------------------------------------------------------------------
+
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
