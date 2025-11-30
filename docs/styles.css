@@ -1,359 +1,51 @@
-/* File: one-stop-solution/docs/styles.css
-   Full stylesheet — replace existing file with this exact content. */
+/* ===========================
+   File: one-stop-solution/docs/styles.css
+   (append/merge the block below into your existing styles.css)
+   =========================== */
 
-/* Root colors and tokens */
-:root{
-  --bg-night: linear-gradient(120deg,#3C257B 0%,#191b2e 100%);
-  --panel-night: rgba(22,18,33,0.95);
-  --text-night: #e1e8f0;
-  --btn-night: linear-gradient(95deg,#8f6ef7 10%,#554ede 88%);
-  --btn-hover-night: linear-gradient(92deg,#6a4ef0, #9e88fc 65%);
-  --textarea-night: #251c3a;
-  --output-night: #251c3a;
-  --shadow-night: 0 12px 36px rgba(0,0,0,0.45);
-
-  --bg-day: linear-gradient(120deg,#d2e7fb 0%,#e7f5ff 100%);
-  --panel-day: #ffffff;
-  --text-day: #263154;
-  --btn-day: linear-gradient(95deg,#3c92df 10%,#bce0ff 88%);
-  --btn-hover-day: linear-gradient(92deg,#0d6efd 10%,#7ec9ff 90%);
-  --textarea-day: #f5faff;
-  --output-day: #f2f6fc;
-  --shadow-day: 0 12px 30px rgba(219,234,255,0.25);
-
-  --radius: 12px;
-  --muted-text: #bdb8d8;
-  --container-width: 960px;
-}
-
-/* Base */
-* { box-sizing: border-box; }
-html,body { height: 100%; }
-body{
-  margin:0;
-  font-family: 'Roboto Mono', monospace;
-  color:var(--text-night);
-  background: var(--bg-night);
-  min-height:100vh;
-  padding: 20px;
-  -webkit-font-smoothing:antialiased;
-  transition: background .35s ease, color .35s ease;
-}
-
-/* Light body */
-body.light{
-  background: var(--bg-day);
-  color: var(--text-day);
-}
-
-/* Theme toggle (top-right) */
-.toggle-mode{
+/* AI status dot placed inside the theme toggle */
+.toggle-mode {
   position: fixed;
   top: 12px;
   right: 12px;
   z-index: 1200;
-  background: rgba(255,255,255,0.12);
-  border:1px solid rgba(255,255,255,0.12);
-  color: var(--muted-text);
-  padding: 8px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 8px 12px;
   border-radius: 8px;
   cursor: pointer;
-}
-body.light .toggle-mode{
-  background: rgba(0,0,0,0.04);
-  border:1px solid #c8defa;
-  color: #375e94;
-}
-
-/* Header */
-.logo-bar{
-  display:flex;
-  gap:14px;
-  align-items:center;
-  justify-content:center;
-  margin-top: 50px;
-}
-.logo-img{
-  width:74px;
-  height:74px;
-  object-fit:contain;
-  border-radius:12px;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.3);
-}
-.logo-title{
-  font-family:'Orbitron', monospace;
-  font-size:2rem;
-  letter-spacing:2px;
-  font-weight:700;
-}
-
-/* Container */
-.container{
-  width:95%;
-  max-width: var(--container-width);
-  margin: 32px auto;
-  background: var(--panel-night);
-  padding: 26px;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-night);
-}
-body.light .container{
-  background: var(--panel-day);
-  box-shadow: var(--shadow-day);
-}
-
-/* Input */
-.input-box{
-  width:100%;
-  min-height: 180px;
-  padding: 16px;
-  background: var(--textarea-night);
-  border-radius: 10px;
-  color: var(--text-night);
-  border: 1px solid rgba(255,255,255,0.03);
-  box-shadow: inset 0 4px 18px rgba(0,0,0,0.45);
-  resize: vertical;
-  font-family: inherit;
-}
-body.light .input-box{
-  background: var(--textarea-day);
-  color: var(--text-day);
-  box-shadow: inset 0 4px 12px rgba(0,0,0,0.06);
-}
-
-/* Buttons base */
-.btn{
-  padding: 10px 16px;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
-  font-family: 'Orbitron', monospace;
-  font-size: 14px;
-  transition: transform .08s ease, box-shadow .12s ease;
-  color: white;
-  margin: 4px 6px 4px 0;
-  display: inline-block;
-}
-
-/* Primary */
-.primary-btn{
-  background: var(--btn-night);
-  box-shadow: 0 6px 18px rgba(83,53,189,0.16);
-}
-.primary-btn:hover{
-  transform: translateY(-2px);
-  background: var(--btn-hover-night);
-}
-
-/* Secondary (muted) */
-.secondary-btn{
-  background: rgba(255,255,255,0.04);
-  color: var(--text-night);
-  box-shadow: none;
-}
-.secondary-btn:hover{
-  transform: translateY(-2px);
+  border: 1px solid rgba(255,255,255,0.12);
   background: rgba(255,255,255,0.06);
 }
-
-/* Light mode button tweaks */
-body.light .primary-btn{
-  background: var(--btn-day);
-  color: #00275b;
-  box-shadow: 0 6px 18px rgba(20,90,160,0.08);
-}
-body.light .primary-btn:hover{
-  background: var(--btn-hover-day);
-}
-body.light .secondary-btn{
+body.light .toggle-mode {
   background: rgba(0,0,0,0.04);
-  color: var(--text-day);
-}
-body.light .secondary-btn:hover{
-  background: rgba(0,0,0,0.06);
+  border: 1px solid #c8defa;
 }
 
-/* Button row and memory */
-.btn-row{
-  margin-top: 16px;
-}
-.memory-box{
-  margin-top: 12px;
-  display:flex;
-  gap: 12px;
-  align-items:center;
-}
-#memoryBadge{
-  color: var(--muted-text);
-  font-size: 0.92rem;
+/* small label inside the toggle */
+.toggle-mode .toggle-label { font-size: 13px; color: var(--muted-text); }
+
+/* Dot default */
+.ai-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+  border: 2px solid rgba(255,255,255,0.15);
 }
 
-/* Output */
-.output-box{
-  margin-top: 14px;
-  padding: 16px;
-  min-height: 140px;
-  background: var(--output-night);
-  border-radius: 10px;
-  white-space: pre-wrap;
-  border: 1px solid rgba(255,255,255,0.03);
-  box-shadow: inset 0 6px 18px rgba(0,0,0,0.42);
-  color: var(--text-night);
-}
-body.light .output-box{
-  background: var(--output-day);
-  color: var(--text-day);
-  box-shadow: inset 0 3px 8px rgba(0,0,0,0.04);
-}
+/* States:
+   - ai-off : green -> indicates "NOT connected" (per your mapping)
+   - ai-on  : red   -> indicates "CONNECTED" (per your mapping)
+*/
+.ai-off { background: #28c76f; /* green */ }
+.ai-on  { background: #ff4d6d; /* red */ }
 
-/* Memory admin floating button */
-.memory-admin{
-  position:fixed;
-  right: 14px;
-  bottom: 14px;
-  z-index: 1100;
-  background: #5b3ff6;
-  color: white;
-  border: none;
-  padding: 10px 12px;
-  border-radius: 10px;
-  cursor: pointer;
-  box-shadow: 0 6px 20px rgba(71,42,160,0.18);
-}
+/* adapt for light mode (more contrast) */
+body.light .ai-off { background: #28a745; border-color: rgba(0,0,0,0.08); }
+body.light .ai-on  { background: #e53935; border-color: rgba(0,0,0,0.08); }
 
-/* Responsive */
-@media (max-width:800px){
-  .logo-title{ font-size: 1.6rem; }
-  .container{ padding: 18px; margin-top: 18px; }
-  .input-box{ min-height: 140px; }
-  .btn{ font-size: 13px; padding: 8px 12px; }
-  .memory-admin{ bottom: 12px; right: 12px; }
-}
-
-/* ============================================================
-   OSS — MODAL + ADMIN PANEL THEME MATCH ADDON
-   ============================================================ */
-
-/* Floating Memory button */
-#memoryAdminBtn {
-    position: fixed;
-    right: 24px;
-    bottom: 24px;
-    padding: 10px 18px;
-    background: var(--btn-night);
-    border-radius: 10px;
-    border: none;
-    font-family: 'Orbitron', monospace;
-    color: white;
-    cursor: pointer;
-    z-index: 2000;
-    font-size: 14px;
-    box-shadow: 0 0 16px rgba(0,0,0,0.35);
-    transition: 0.28s;
-}
-#memoryAdminBtn:hover {
-    background: var(--btn-hover-night);
-    transform: translateY(-2px);
-}
-body.light #memoryAdminBtn {
-    background: var(--btn-day);
-    color: #00275b;
-    box-shadow: 0 0 14px rgba(0,0,0,0.15);
-}
-body.light #memoryAdminBtn:hover {
-    background: var(--btn-hover-day);
-}
-
-/* Modal backdrop */
-.oss-modal-backdrop {
-    backdrop-filter: blur(4px);
-    background: rgba(0,0,0,0.45) !important;
-}
-
-/* Modal container */
-.oss-modal {
-    background: var(--panel-night) !important;
-    color: var(--text-night) !important;
-    border: 1px solid rgba(255,255,255,0.05);
-    box-shadow: 0 0 28px rgba(0,0,0,0.55);
-}
-
-/* Light mode adaptation */
-body.light .oss-modal {
-    background: var(--panel-day) !important;
-    color: var(--text-day) !important;
-    border: 1px solid rgba(0,0,0,0.08);
-    box-shadow: 0 0 20px rgba(0,0,0,0.12);
-}
-
-/* Modal text input */
-.oss-modal textarea {
-    background: var(--textarea-night) !important;
-    border: 1px solid rgba(255,255,255,0.06) !important;
-    box-shadow: inset 0 0 8px rgba(0,0,0,0.35);
-}
-body.light .oss-modal textarea {
-    background: var(--textarea-day) !important;
-    border: 1px solid rgba(0,0,0,0.15) !important;
-    box-shadow: inset 0 0 5px rgba(0,0,0,0.12);
-}
-
-/* Modal buttons */
-.oss-modal .btn {
-    padding: 10px 18px !important;
-    border-radius: 8px !important;
-    font-family: 'Orbitron', monospace !important;
-}
-
-.oss-modal .btn.primary-btn {
-    background: var(--btn-night) !important;
-    color: white !important;
-}
-.oss-modal .btn.primary-btn:hover {
-    background: var(--btn-hover-night) !important;
-}
-body.light .oss-modal .btn.primary-btn {
-    background: var(--btn-day) !important;
-    color: #00275b !important;
-}
-body.light .oss-modal .btn.primary-btn:hover {
-    background: var(--btn-hover-day) !important;
-}
-
-.oss-modal .btn.secondary-btn {
-    background: rgba(255,255,255,0.08) !important;
-    color: #e1e8f0 !important;
-}
-.oss-modal .btn.secondary-btn:hover {
-    background: rgba(255,255,255,0.15) !important;
-}
-body.light .oss-modal .btn.secondary-btn {
-    background: rgba(0,0,0,0.08) !important;
-    color: #274070 !important;
-}
-body.light .oss-modal .btn.secondary-btn:hover {
-    background: rgba(0,0,0,0.14) !important;
-}
-
-/* Admin panel interior list boxes */
-#oss-admin-list div {
-    transition: 0.25s;
-}
-#oss-admin-list div:hover {
-    background: rgba(255,255,255,0.04);
-}
-body.light #oss-admin-list div:hover {
-    background: rgba(0,0,0,0.06);
-}
-
-/* Scrollbar for long lists */
-.oss-modal::-webkit-scrollbar {
-    width: 10px;
-}
-.oss-modal::-webkit-scrollbar-thumb {
-    background: #6f58ff55;
-    border-radius: 8px;
-}
-body.light .oss-modal::-webkit-scrollbar-thumb {
-    background: #8cbcff88;
-}
+/* tooltip style when hovered (browser default title is used; can be replaced if desired) */
+/* keep rest of your styles unchanged */
