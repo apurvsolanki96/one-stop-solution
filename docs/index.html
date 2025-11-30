@@ -1,96 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ONE STOP SOLUTION – Flightscape NOTAM AI Processor</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ONE STOP SOLUTION – Flightscape NOTAM AI Processor</title>
 
-  <!-- your existing stylesheet (keeps look/colours as before) -->
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="icon" type="image/png" href="assets/flightscape-logo.png" />
+<link rel="stylesheet" href="styles.css" />
+<link rel="icon" type="image/png" href="assets/flightscape-logo.png" />
 </head>
+
 <body>
 
-  <!-- DAY/NIGHT TOGGLE (keeps original onclick) -->
-  <button class="toggle-mode" onclick="toggleMode()">🌙/☀️</button>
+<!-- Day/Night Toggle -->
+<button class="toggle-mode" onclick="toggleMode()">🌙/☀️</button>
 
-  <!-- HEADER (unchanged) -->
-  <div class="logo-bar">
+<!-- HEADER -->
+<div class="logo-bar">
     <img src="assets/flightscape-logo.png" class="logo-img" alt="logo" />
     <span class="logo-title">ONE STOP SOLUTION</span>
-  </div>
+</div>
 
-  <!-- MAIN CONTAINER -->
-  <div class="container">
+<!-- MAIN CONTAINER -->
+<div class="container">
 
-    <!-- NOTAM INPUT: keep textarea appearance; id matches script.js -->
-    <textarea id="notamInput" placeholder="Paste NOTAM here..."></textarea>
+    <!-- NOTAM INPUT -->
+    <textarea id="notamInput" class="input-box" placeholder="Paste NOTAM here..."></textarea>
 
-    <!-- Buttons row: keep original inline onclick handlers so styling & behavior look identical -->
+    <!-- BUTTON ROW (RESTORED ORIGINAL CLASSES) -->
     <div class="btn-row">
-      <button onclick="processNOTAM()">Process</button>
-      <button onclick="aiExplain()">Explain</button>
-      <button onclick="aiSimplify()">Simplify</button>
-      <button onclick="aiRisk()">Risk</button>
-
-      <!-- Parse Offline button: visually same, will be wired to offline function below -->
-      <button id="btnParseOffline">Parse Offline</button>
+        <button class="btn primary-btn" onclick="processNOTAM()">Process</button>
+        <button class="btn secondary-btn" onclick="aiExplain()">Explain</button>
+        <button class="btn secondary-btn" onclick="aiSimplify()">Simplify</button>
+        <button class="btn secondary-btn" onclick="aiRisk()">Risk</button>
+        <button class="btn primary-btn" id="btnParseOffline">Parse Offline</button>
     </div>
 
-    <!-- Memory controls (keep styling) -->
+    <!-- MEMORY -->
     <div class="memory-box">
-      <button id="btnSaveMemory" class="btn">Save to Memory</button>
-      <span id="memoryBadge">Memory: idle</span>
+        <button id="btnSaveMemory" class="btn primary-btn">Save to Memory</button>
+        <span id="memoryBadge">Memory: idle</span>
     </div>
 
     <h3 class="out-title">OUTPUT</h3>
 
-    <!-- Output area: <pre> keeps monospace & spacing -->
-    <pre id="notamOutput" class="output-box" aria-live="polite"></pre>
+    <!-- OUTPUT -->
+    <pre id="notamOutput" class="output-box"></pre>
     <span id="copyNotice" class="copy-notice"></span>
-  </div>
+</div>
 
-  <!-- Load offline parser FIRST so window.OfflineNotamParser exists -->
-  <script src="offline-parser.js"></script>
+<!-- Load scripts -->
+<script src="offline-parser.js"></script>
+<script src="script.js"></script>
 
-  <!-- Load main UI script SECOND (it creates window.oss and maps global functions like processNOTAM) -->
-  <script src="script.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const offlineBtn = document.getElementById("btnParseOffline");
+    offlineBtn.addEventListener("click", function () {
+        if (window.oss && typeof window.oss.parseNow === "function") {
+            window.oss.parseNow(true);
+        } else {
+            processNOTAM();
+        }
+    });
+});
+</script>
 
-  <!-- Small inline wiring: map Parse Offline button to offline-only run,
-       and ensure buttons keep their old look/behavior even if scripts initialize slowly. -->
-  <script>
-    (function () {
-      function safeCall(fn, ...args) {
-        try { if (typeof fn === 'function') fn(...args); else console.warn('function not ready', fn); }
-        catch (e) { console.error(e); }
-      }
-
-      // When the DOM is ready, attach the Parse Offline button to call the offline flow.
-      document.addEventListener('DOMContentLoaded', function () {
-        var offlineBtn = document.getElementById('btnParseOffline');
-        if (!offlineBtn) return;
-
-        offlineBtn.addEventListener('click', function () {
-          // If window.oss.parseNow exists (set by script.js), call it with true to force offline-only.
-          if (window.oss && typeof window.oss.parseNow === 'function') {
-            safeCall(window.oss.parseNow, true);
-            return;
-          }
-          // Fallback: try the global processNOTAM if available
-          if (typeof window.processNOTAM === 'function') {
-            safeCall(window.processNOTAM);
-            return;
-          }
-          alert('Parser not ready yet — please try again in a second.');
-        });
-      });
-
-      // Also keep the old toggle function reference in case HTML calls it early.
-      // (script.js has already exposed window.toggleMode mapping).
-      if (typeof window.toggleMode !== 'function' && window.toggleTheme) {
-        window.toggleMode = window.toggleTheme;
-      }
-    })();
-  </script>
 </body>
 </html>
