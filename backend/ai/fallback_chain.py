@@ -1,12 +1,7 @@
-"""
-fallback_chain.py
-Central intelligence chain that tries multiple AI engines + parser + memory
-and merges results using confidence + soft_merge logic.
-"""
-
+# backend/ai/fallback_chain.py
 import traceback
-
-from backend.ai.openai_client import openai_complete
+from backend.ai_providers.openai_client import generate_openai # Assuming direct wrapper or driver usage
+from backend.ai_providers.gemini_client import generate_gemini # NEW
 from backend.ai.copilot_client import copilot_complete
 from backend.ai.offline_engine import offline_response
 from backend.utils.memory_engine import memory_lookup, memory_learn
@@ -14,135 +9,89 @@ from backend.utils.soft_merge import soft_merge
 from backend.utils.confidence_master import evaluate_confidence
 from backend.parser.parser_logic import run_master_parser
 
-
-# -----------------------------
-# PRIORITY ORDER (Batch 9 Final)
-# -----------------------------
-# 1. OpenAI (primary)
-# 2. OpenAI-mini (lite fallback)
-# 3. Copilot
-# 4. Offline template-based AI
-# 5. Parser (deterministic)
-# 6. Memory (learned corrections)
-#
-# Final output merges best sources using:
-#   - scoring
-#   - confidence weighting
-#   - heuristics
-# -----------------------------
-
-
 async def intelligent_fallback(notam_text: str):
     """
-    Executes the full fallback chain:
-    AI Primary → Fallback AI → Offline → Parser → Memory → Merged result
-    Returns:
-        {
-            "output": "...",
-            "confidence": 0-1,
-            "sources": ["openai", "parser", ...]
-        }
+    Priority: OpenAI -> Gemini -> Copilot -> Offline -> Parser -> Memory
     """
-    sources_used = {}
     responses = {}
+    sources_used = []
 
-    # -----------------------------
-    # 1. Try OpenAI (Primary)
-    # -----------------------------
+    # 1. OpenAI (Primary)
     try:
-        ai1 = await openai_complete(notam_text)
+        ai1 = generate_openai(notam_text) # Simplified call
         if ai1:
             responses["openai"] = ai1
-            sources_used["openai"] = True
+            sources_used.append("openai")
     except Exception:
-        sources_used["openai"] = False
+        pass
 
-    # -----------------------------
-    # 2. Try OpenAI-mini
-    # -----------------------------
-    try:
-        ai2 = await openai_complete(notam_text, miniature=True)
-        if ai2:
-            responses["openai_mini"] = ai2
-            sources_used["openai_mini"] = True
-    except Exception:
-        sources_used["openai_mini"] = False
+    # 2. Google Gemini (Redundancy Layer 1)
+    if "openai" not in responses: # Only try if previous failed (or remove 'if' to run parallel)
+        try:
+            ai_gemini = await generate_gemini(notam_text)
+            if ai_gemini:
+                responses["gemini"] = ai_gemini
+                sources_used.append("gemini")
+        except Exception:
+            pass
 
-    # -----------------------------
-    # 3. Try Copilot
-    # -----------------------------
-    try:
-        ai3 = await copilot_complete(notam_text)
-        if ai3:
-            responses["copilot"] = ai3
-            sources_used["copilot"] = True
-    except Exception:
-        sources_used["copilot"] = False
+    # 3. Copilot (Redundancy Layer 2)
+    if not responses:
+        try:
+            ai3 = await copilot_complete(notam_text)
+            if ai3:
+                responses["copilot"] = ai3
+                sources_used.append("copilot")
+        except Exception:
+            pass
 
-    # -----------------------------
-    # 4. Offline Template AI
-    # -----------------------------
+    # 4. Offline Template AI (Safety Net)
     try:
         offline = offline_response(notam_text)
-        responses["offline"] = offline
-        sources_used["offline"] = True
+        if offline: 
+            responses["offline"] = offline
+            sources_used.append("offline")
     except Exception:
-        sources_used["offline"] = False
+        pass
 
-    # -----------------------------
-    # 5. Deterministic Parser Engine
-    # -----------------------------
+    # 5. Deterministic Parser (Logic)
     try:
         parser_out = run_master_parser(notam_text)
         if parser_out:
             responses["parser"] = parser_out
-            sources_used["parser"] = True
+            sources_used.append("parser")
     except Exception:
-        traceback.print_exc()
-        sources_used["parser"] = False
+        pass
 
-    # -----------------------------
-    # 6. Memory Lookup (learned NOTAM patterns)
-    # -----------------------------
+    # 6. Memory (History)
     try:
         mem = memory_lookup(notam_text)
         if mem:
             responses["memory"] = mem
-            sources_used["memory"] = True
+            sources_used.append("memory")
     except Exception:
-        sources_used["memory"] = False
+        pass
 
-    # -----------------------------
-    # If nothing produced ANYTHING
-    # -----------------------------
     if not responses:
         return {
-            "output": "Unable to decode NOTAM. No system produced a result.",
+            "output": "CRITICAL FAILURE: All AI and Offline systems failed.",
             "confidence": 0.0,
             "sources": []
         }
 
-    # -----------------------------
-    # FINAL MERGE LOGIC
-    # -----------------------------
+    # Merge Logic
     final = soft_merge(responses)
-
-    # -----------------------------
-    # CONFIDENCE SCORING
-    # -----------------------------
     score = evaluate_confidence(final, responses)
 
-    # -----------------------------
-    # AUTO-LEARN IF HIGH CONFIDENCE
-    # -----------------------------
-    try:
-        if score >= 0.85:
+    # Auto-Learn
+    if score >= 0.85:
+        try:
             memory_learn(notam_text, final)
-    except Exception:
-        pass
+        except:
+            pass
 
     return {
         "output": final,
         "confidence": score,
-        "sources": list(responses.keys())
+        "sources": sources_used
     }
