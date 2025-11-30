@@ -1,69 +1,74 @@
+<!-- File: one-stop-solution/docs/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>ONE STOP SOLUTION – Flightscape NOTAM AI Processor</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ONE STOP SOLUTION – Flightscape NOTAM AI Processor</title>
 
-<link rel="stylesheet" href="styles.css" />
-<link rel="icon" type="image/png" href="assets/flightscape-logo.png" />
+  <!-- Keep your existing site stylesheet filename -->
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="assets/flightscape-logo.png" />
 </head>
-
 <body>
 
-<!-- Day/Night Toggle -->
-<button class="toggle-mode" onclick="toggleMode()">🌙/☀️</button>
+  <!-- Day/Night Toggle — keep onclick for backward compatibility and id for script.js -->
+  <button id="btnThemeToggle" class="toggle-mode" onclick="toggleMode()">🌙/☀️</button>
 
-<!-- HEADER -->
-<div class="logo-bar">
+  <!-- HEADER (unchanged layout) -->
+  <div class="logo-bar">
     <img src="assets/flightscape-logo.png" class="logo-img" alt="logo" />
     <span class="logo-title">ONE STOP SOLUTION</span>
-</div>
+  </div>
 
-<!-- MAIN CONTAINER -->
-<div class="container">
+  <!-- MAIN -->
+  <div class="container">
 
     <!-- NOTAM INPUT -->
     <textarea id="notamInput" class="input-box" placeholder="Paste NOTAM here..."></textarea>
 
-    <!-- BUTTON ROW (RESTORED ORIGINAL CLASSES) -->
+    <!-- BUTTON ROW: keep classes so CSS styles them -->
     <div class="btn-row">
-        <button class="btn primary-btn" onclick="processNOTAM()">Process</button>
-        <button class="btn secondary-btn" onclick="aiExplain()">Explain</button>
-        <button class="btn secondary-btn" onclick="aiSimplify()">Simplify</button>
-        <button class="btn secondary-btn" onclick="aiRisk()">Risk</button>
-        <button class="btn primary-btn" id="btnParseOffline">Parse Offline</button>
+      <button id="btnProcess" class="btn primary-btn" onclick="processNOTAM()">Process</button>
+      <button id="btnExplain" class="btn secondary-btn" onclick="aiExplain()">Explain</button>
+      <button id="btnSimplify" class="btn secondary-btn" onclick="aiSimplify()">Simplify</button>
+      <button id="btnRisk" class="btn secondary-btn" onclick="aiRisk()">Risk</button>
+      <button id="btnParseOffline" class="btn primary-btn">Parse Offline</button>
     </div>
 
     <!-- MEMORY -->
     <div class="memory-box">
-        <button id="btnSaveMemory" class="btn primary-btn">Save to Memory</button>
-        <span id="memoryBadge">Memory: idle</span>
+      <button id="btnSaveMemory" class="btn primary-btn">Save to Memory</button>
+      <span id="memoryBadge">Memory: 0 items</span>
     </div>
 
     <h3 class="out-title">OUTPUT</h3>
 
     <!-- OUTPUT -->
-    <pre id="notamOutput" class="output-box"></pre>
+    <pre id="notamOutput" class="output-box" aria-live="polite"></pre>
     <span id="copyNotice" class="copy-notice"></span>
-</div>
+  </div>
 
-<!-- Load scripts -->
-<script src="offline-parser.js"></script>
-<script src="script.js"></script>
+  <!-- SCRIPTS: offline parser must load before main script -->
+  <script src="offline-parser.js"></script>
+  <script src="script.js"></script>
 
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    const offlineBtn = document.getElementById("btnParseOffline");
-    offlineBtn.addEventListener("click", function () {
-        if (window.oss && typeof window.oss.parseNow === "function") {
-            window.oss.parseNow(true);
-        } else {
-            processNOTAM();
-        }
+  <!-- Small wiring: Parse Offline button -> force offline parse -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const offlineBtn = document.getElementById('btnParseOffline');
+      if (offlineBtn) {
+        offlineBtn.addEventListener('click', function () {
+          if (window.oss && typeof window.oss.parseNow === 'function') {
+            window.oss.parseNow(true); // force offline-only
+            return;
+          }
+          // fallback
+          if (typeof processNOTAM === 'function') processNOTAM();
+          else alert('Parser not ready yet — try again in a second.');
+        });
+      }
     });
-});
-</script>
-
+  </script>
 </body>
 </html>
