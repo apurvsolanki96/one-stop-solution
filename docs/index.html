@@ -1,31 +1,31 @@
-<!-- File: one-stop-solution/docs/index.html -->
+/* ===========================
+   File: one-stop-solution/docs/index.html
+   (replace or merge the toggle button markup with this)
+   =========================== */
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>ONE STOP SOLUTION – Flightscape NOTAM AI Processor</title>
-
-  <!-- main stylesheet (replace this file with the CSS below) -->
   <link rel="stylesheet" href="styles.css" />
   <link rel="icon" type="image/png" href="assets/flightscape-logo.png" />
 </head>
 <body>
-  <!-- Day/Night Toggle (top-right) -->
-  <button id="btnThemeToggle" class="toggle-mode" aria-label="Toggle theme">Light</button>
+  <!-- Theme toggle with AI status dot inside -->
+  <button id="btnThemeToggle" class="toggle-mode" aria-label="Toggle theme">
+    <span id="aiStatusDot" class="ai-dot ai-off" title="AI status: unknown"></span>
+    <span class="toggle-label">Light</span>
+  </button>
 
-  <!-- Header -->
   <div class="logo-bar">
     <img src="assets/flightscape-logo.png" class="logo-img" alt="logo" />
     <span class="logo-title">ONE STOP SOLUTION</span>
   </div>
 
-  <!-- Main container -->
   <div class="container">
-    <!-- NOTAM input -->
     <textarea id="notamInput" class="input-box" placeholder="Paste NOTAM here..."></textarea>
 
-    <!-- Buttons row -->
     <div class="btn-row controls">
       <button id="btnProcess" class="btn primary-btn" onclick="processNOTAM()">Process</button>
       <button id="btnExplain" class="btn secondary-btn" onclick="aiExplain()">Explain</button>
@@ -34,48 +34,19 @@
       <button id="btnParseOffline" class="btn primary-btn">Parse Offline</button>
     </div>
 
-    <!-- Memory -->
     <div class="memory-box">
       <button id="btnSaveMemory" class="btn primary-btn">Save to Memory</button>
       <span id="memoryBadge">Memory: 0 items</span>
     </div>
 
     <h3 class="out-title">OUTPUT</h3>
-
-    <!-- Output area -->
     <pre id="notamOutput" class="output-box" aria-live="polite"></pre>
     <span id="copyNotice" class="copy-notice" aria-hidden="true"></span>
   </div>
 
-  <!-- Floating Memory Admin button -->
   <button id="memoryAdminBtn" class="memory-admin" title="Memory Admin">Memory</button>
 
-  <!-- Scripts: offline parser must load before UI script -->
   <script src="offline-parser.js"></script>
   <script src="script.js"></script>
-
-  <!-- Safety wiring: ensure Parse Offline always works even if script.js loads slowly -->
-  <script>
-    (function () {
-      document.addEventListener('DOMContentLoaded', function () {
-        var offlineBtn = document.getElementById('btnParseOffline');
-        if (!offlineBtn) return;
-        offlineBtn.addEventListener('click', function () {
-          if (window.oss && typeof window.oss.parseNow === 'function') {
-            window.oss.parseNow(true);
-            return;
-          }
-          if (typeof processNOTAM === 'function') processNOTAM();
-          else alert('Parser not ready yet — try again in a second.');
-        });
-        // keep theme label in sync if script hasn't loaded
-        var themeBtn = document.getElementById('btnThemeToggle');
-        if (themeBtn && window.localStorage) {
-          var t = localStorage.getItem('oss_theme_v1') || 'dark';
-          themeBtn.textContent = (t === 'light') ? 'Dark' : 'Light';
-        }
-      });
-    })();
-  </script>
 </body>
 </html>
