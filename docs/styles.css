@@ -1,338 +1,231 @@
-// File: one-stop-solution/docs/script.js (REPLACE)
-// Frontend glue: theme toggle, online/offline parse fallback, memory (localStorage),
-// admin panel, and Save-to-Memory dialog.
+/* File: one-stop-solution/docs/styles.css
+   Full stylesheet — replace existing file with this exact content. */
 
-(function () {
-  'use strict';
+/* Root colors and tokens */
+:root{
+  --bg-night: linear-gradient(120deg,#3C257B 0%,#191b2e 100%);
+  --panel-night: rgba(22,18,33,0.95);
+  --text-night: #e1e8f0;
+  --btn-night: linear-gradient(95deg,#8f6ef7 10%,#554ede 88%);
+  --btn-hover-night: linear-gradient(92deg,#6a4ef0, #9e88fc 65%);
+  --textarea-night: #251c3a;
+  --output-night: #251c3a;
+  --shadow-night: 0 12px 36px rgba(0,0,0,0.45);
 
-  // --- Utilities ---
-  const $ = (sel) => document.querySelector(sel);
-  const byId = (id) => document.getElementById(id);
-  const MEM_KEY = 'oss_learned_notams_v1';
-  const THEME_KEY = 'oss_theme_v1';
-  function now() { return new Date().toISOString(); }
-  function canonicalInput(s) { return (s || '').trim().replace(/\s+/g, ' ').toUpperCase(); }
+  --bg-day: linear-gradient(120deg,#d2e7fb 0%,#e7f5ff 100%);
+  --panel-day: #ffffff;
+  --text-day: #263154;
+  --btn-day: linear-gradient(95deg,#3c92df 10%,#bce0ff 88%);
+  --btn-hover-day: linear-gradient(92deg,#0d6efd 10%,#7ec9ff 90%);
+  --textarea-day: #f5faff;
+  --output-day: #f2f6fc;
+  --shadow-day: 0 12px 30px rgba(219,234,255,0.25);
 
-  // --- Memory helpers (localStorage) ---
-  function loadMemory() { try { return JSON.parse(localStorage.getItem(MEM_KEY) || '[]'); } catch (e) { return []; } }
-  function saveMemory(arr) { localStorage.setItem(MEM_KEY, JSON.stringify(arr || [])); updateMemoryBadge(); }
-  function updateMemoryBadge() { const el = byId('memoryBadge'); if (!el) return; const n = loadMemory().length; el.textContent = `Memory: ${n} item${n === 1 ? '' : 's'}`; }
-  function addMemoryEntry(inputText, outputArray) {
-    const mem = loadMemory();
-    const key = canonicalInput(inputText);
-    const entry = { id: Math.random().toString(36).slice(2,9), input: key, expected_output: outputArray, created_at: now() };
-    const idx = mem.findIndex(m => m.input === key);
-    if (idx >= 0) mem[idx] = entry; else mem.push(entry);
-    saveMemory(mem);
-    return entry;
-  }
-  function removeMemoryById(id) {
-    const mem = loadMemory().filter(m => m.id !== id);
-    saveMemory(mem);
-  }
-  function updateMemoryById(id, obj) {
-    const mem = loadMemory();
-    const idx = mem.findIndex(m => m.id === id);
-    if (idx >= 0) { mem[idx] = { ...mem[idx], ...obj }; saveMemory(mem); return mem[idx]; }
-    return null;
-  }
-  function findMemoryExact(inputText) {
-    const key = canonicalInput(inputText);
-    return loadMemory().find(m => m.input === key) || null;
-  }
-  function findMemoryFuzzy(inputText) {
-    const key = canonicalInput(inputText);
-    return loadMemory().filter(m => m.input.includes(key) || key.includes(m.input)).slice(0,5);
-  }
+  --radius: 12px;
+  --muted-text: #bdb8d8;
+  --container-width: 960px;
+}
 
-  // --- Theme handling ---
-  const themeBtn = byId('btnThemeToggle');
-  function applyTheme() {
-    const theme = localStorage.getItem(THEME_KEY) || 'dark';
-    document.body.classList.toggle('light', theme === 'light');
-    if (themeBtn) themeBtn.textContent = (theme === 'light') ? 'Dark' : 'Light';
-  }
-  function toggleTheme() {
-    const cur = localStorage.getItem(THEME_KEY) || 'dark';
-    const next = cur === 'dark' ? 'light' : 'dark';
-    localStorage.setItem(THEME_KEY, next);
-    applyTheme();
-  }
+/* Base */
+* { box-sizing: border-box; }
+html,body { height: 100%; }
+body{
+  margin:0;
+  font-family: 'Roboto Mono', monospace;
+  color:var(--text-night);
+  background: var(--bg-night);
+  min-height:100vh;
+  padding: 20px;
+  -webkit-font-smoothing:antialiased;
+  transition: background .35s ease, color .35s ease;
+}
 
-  // --- Offline / Online parsing ---
-  const ONLINE_ENDPOINT = '/process-notam';
-  const ONLINE_TIMEOUT = 2500; // ms
+/* Light body */
+body.light{
+  background: var(--bg-day);
+  color: var(--text-day);
+}
 
-  async function callOnline(notamText) {
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), ONLINE_TIMEOUT);
-      const res = await fetch(ONLINE_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notam: notamText }),
-        signal: controller.signal
-      });
-      clearTimeout(timer);
-      if (!res.ok) throw new Error('bad response ' + res.status);
-      return await res.json();
-    } catch (e) {
-      return null;
-    }
-  }
+/* Theme toggle (top-right) */
+.toggle-mode{
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 1200;
+  background: rgba(255,255,255,0.12);
+  border:1px solid rgba(255,255,255,0.12);
+  color: var(--muted-text);
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+body.light .toggle-mode{
+  background: rgba(0,0,0,0.04);
+  border:1px solid #c8defa;
+  color: #375e94;
+}
 
-  function parseOffline(notamText) {
-    if (window.OfflineNotamParser && typeof window.OfflineNotamParser.parse === 'function') {
-      try {
-        return window.OfflineNotamParser.parse(notamText);
-      } catch (e) {
-        return { success: false };
-      }
-    }
-    return { success: false };
-  }
+/* Header */
+.logo-bar{
+  display:flex;
+  gap:14px;
+  align-items:center;
+  justify-content:center;
+  margin-top: 50px;
+}
+.logo-img{
+  width:74px;
+  height:74px;
+  object-fit:contain;
+  border-radius:12px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+}
+.logo-title{
+  font-family:'Orbitron', monospace;
+  font-size:2rem;
+  letter-spacing:2px;
+  font-weight:700;
+}
 
-  // try to parse text lines or JSON returned by model
-  function extractSegmentsFromModelText(text) {
-    if (!text) return [];
-    text = String(text).trim();
-    // If JSON, parse
-    try {
-      const parsed = JSON.parse(text);
-      if (parsed && Array.isArray(parsed.segments)) return parsed.segments;
-    } catch (e) {
-      // not JSON
-    }
-    // fallback: split lines and return non-empty lines
-    const lines = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-    return lines.length ? lines : [];
-  }
+/* Container */
+.container{
+  width:95%;
+  max-width: var(--container-width);
+  margin: 32px auto;
+  background: var(--panel-night);
+  padding: 26px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-night);
+}
+body.light .container{
+  background: var(--panel-day);
+  box-shadow: var(--shadow-day);
+}
 
-  // --- UI helpers ---
-  const inputArea = byId('notamInput');
-  const outputArea = byId('notamOutput');
-  const parseOfflineBtn = byId('btnParseOffline');
-  const saveMemoryBtn = byId('btnSaveMemory');
+/* Input */
+.input-box{
+  width:100%;
+  min-height: 180px;
+  padding: 16px;
+  background: var(--textarea-night);
+  border-radius: 10px;
+  color: var(--text-night);
+  border: 1px solid rgba(255,255,255,0.03);
+  box-shadow: inset 0 4px 18px rgba(0,0,0,0.45);
+  resize: vertical;
+  font-family: inherit;
+}
+body.light .input-box{
+  background: var(--textarea-day);
+  color: var(--text-day);
+  box-shadow: inset 0 4px 12px rgba(0,0,0,0.06);
+}
 
-  function setOutput(text, extra = '') {
-    if (!outputArea) return;
-    outputArea.textContent = text + (extra ? '\n\n' + extra : '');
-  }
+/* Buttons base */
+.btn{
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-family: 'Orbitron', monospace;
+  font-size: 14px;
+  transition: transform .08s ease, box-shadow .12s ease;
+  color: white;
+  margin: 4px 6px 4px 0;
+  display: inline-block;
+}
 
-  // Save-to-memory dialog: prompt user for expected output (comma-separated)
-  function promptAndSaveMemory(rawNotam, suggested = []) {
-    // suggested is an array — present as joined lines
-    const suggestedText = suggested.length ? suggested.join('\n') : '';
-    const promptText = 'Enter expected outputs (comma-separated) for this NOTAM.\n\nSuggested:\n' + suggestedText + '\n\nIf you cancel, nothing will be saved.';
-    const user = prompt(promptText, suggested.join(', '));
-    if (!user) { alert('Save cancelled'); return null; }
-    const arr = user.split(',').map(s => s.trim()).filter(Boolean);
-    addMemoryEntry(rawNotam, arr);
-    updateMemoryBadge();
-    alert('Saved to memory: ' + arr.length + ' item(s).');
-    return arr;
-  }
+/* Primary */
+.primary-btn{
+  background: var(--btn-night);
+  box-shadow: 0 6px 18px rgba(83,53,189,0.16);
+}
+.primary-btn:hover{
+  transform: translateY(-2px);
+  background: var(--btn-hover-night);
+}
 
-  // --- Parse flow orchestrator ---
-  async function parseNotamFlow(forceOffline = false) {
-    const raw = inputArea ? inputArea.value : '';
-    if (!raw || !raw.trim()) { setOutput('[ERROR] empty input'); return; }
+/* Secondary (muted) */
+.secondary-btn{
+  background: rgba(255,255,255,0.04);
+  color: var(--text-night);
+  box-shadow: none;
+}
+.secondary-btn:hover{
+  transform: translateY(-2px);
+  background: rgba(255,255,255,0.06);
+}
 
-    // 1) check memory exact match
-    const memExact = findMemoryExact(raw);
-    if (memExact && Array.isArray(memExact.expected_output) && memExact.expected_output.length) {
-      setOutput(memExact.expected_output.join('\n'), '(Recalled from memory)');
-      return;
-    }
+/* Light mode button tweaks */
+body.light .primary-btn{
+  background: var(--btn-day);
+  color: #00275b;
+  box-shadow: 0 6px 18px rgba(20,90,160,0.08);
+}
+body.light .primary-btn:hover{
+  background: var(--btn-hover-day);
+}
+body.light .secondary-btn{
+  background: rgba(0,0,0,0.04);
+  color: var(--text-day);
+}
+body.light .secondary-btn:hover{
+  background: rgba(0,0,0,0.06);
+}
 
-    // 2) try online unless forced offline
-    if (!forceOffline) {
-      const online = await callOnline(raw);
-      if (online && Array.isArray(online.segments) && online.segments.length) {
-        setOutput(online.segments.join('\n'), '(Online parser)');
-        // Ask user whether to save to memory (auto-suggest)
-        if (confirm('Save online result to memory? (OK = save, Cancel = skip)')) {
-          addMemoryEntry(raw, online.segments);
-          updateMemoryBadge();
-        }
-        return;
-      }
-    }
+/* Button row and memory */
+.btn-row{
+  margin-top: 16px;
+}
+.memory-box{
+  margin-top: 12px;
+  display:flex;
+  gap: 12px;
+  align-items:center;
+}
+#memoryBadge{
+  color: var(--muted-text);
+  font-size: 0.92rem;
+}
 
-    // 3) offline parser
-    const offline = parseOffline(raw);
-    if (offline && offline.success && Array.isArray(offline.segments) && offline.segments.length) {
-      setOutput(offline.segments.join('\n'), '(Offline parser)');
-      // Ask user to save offline result
-      if (confirm('Save offline result to memory? (OK = save, Cancel = skip)')) {
-        addMemoryEntry(raw, offline.segments);
-        updateMemoryBadge();
-      }
-      return;
-    }
+/* Output */
+.output-box{
+  margin-top: 14px;
+  padding: 16px;
+  min-height: 140px;
+  background: var(--output-night);
+  border-radius: 10px;
+  white-space: pre-wrap;
+  border: 1px solid rgba(255,255,255,0.03);
+  box-shadow: inset 0 6px 18px rgba(0,0,0,0.42);
+  color: var(--text-night);
+}
+body.light .output-box{
+  background: var(--output-day);
+  color: var(--text-day);
+  box-shadow: inset 0 3px 8px rgba(0,0,0,0.04);
+}
 
-    // 4) no parse result — allow user to enter expected output for memory
-    setOutput('[Saved to memory for learning] Provide expected output using the dialog.', '');
-    // Save placeholder and prompt user for expected output
-    const suggested = [];
-    addMemoryEntry(raw, null); // store placeholder
-    updateMemoryBadge();
-    promptAndSaveMemory(raw, suggested);
-  }
+/* Memory admin floating button */
+.memory-admin{
+  position:fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 1100;
+  background: #5b3ff6;
+  color: white;
+  border: none;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(71,42,160,0.18);
+}
 
-  // --- Save button handler (opens prompt if needed) ---
-  function onSaveToMemoryClicked() {
-    const raw = inputArea ? inputArea.value : '';
-    if (!raw || !raw.trim()) { alert('No NOTAM input to save.'); return; }
-    // If outputArea has content, use it as suggestion
-    const out = outputArea ? outputArea.textContent.trim() : '';
-    const suggested = out ? out.split(/\r?\n/).map(s => s.trim()).filter(Boolean) : [];
-    promptAndSaveMemory(raw, suggested);
-  }
-
-  // --- Admin panel (simple modal) ---
-  function openMemoryAdmin() {
-    // create modal if missing
-    let modal = byId('memoryAdminModal');
-    if (!modal) {
-      modal = document.createElement('div');
-      modal.id = 'memoryAdminModal';
-      modal.style.position = 'fixed';
-      modal.style.left = '50%';
-      modal.style.top = '50%';
-      modal.style.transform = 'translate(-50%,-50%)';
-      modal.style.width = '760px';
-      modal.style.maxWidth = '95%';
-      modal.style.maxHeight = '80%';
-      modal.style.overflow = 'auto';
-      modal.style.background = 'var(--panel-night)';
-      modal.style.color = 'var(--text-night)';
-      modal.style.padding = '18px';
-      modal.style.borderRadius = '12px';
-      modal.style.boxShadow = '0 10px 30px rgba(0,0,0,0.6)';
-      modal.style.zIndex = 100000;
-      modal.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-          <h3 style="margin:0">Memory Admin</h3>
-          <div>
-            <button id="closeMemAdmin" class="btn secondary-btn" style="margin-right:8px">Close</button>
-            <button id="exportMem" class="btn primary-btn">Export JSON</button>
-          </div>
-        </div>
-        <div id="memList"></div>
-        <div style="margin-top:12px;text-align:right;">
-          <button id="importMemBtn" class="btn secondary-btn">Import JSON</button>
-        </div>
-      `;
-      document.body.appendChild(modal);
-      byId('closeMemAdmin').addEventListener('click', () => modal.remove());
-      byId('exportMem').addEventListener('click', () => {
-        const data = JSON.stringify(loadMemory(), null, 2);
-        const blob = new Blob([data], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = 'memory.json'; a.click(); URL.revokeObjectURL(url);
-      });
-      byId('importMemBtn').addEventListener('click', () => {
-        const txt = prompt('Paste memory JSON to import (will replace existing memory).');
-        if (!txt) return;
-        try {
-          const parsed = JSON.parse(txt);
-          if (!Array.isArray(parsed)) throw new Error('Expected JSON array');
-          saveMemory(parsed);
-          alert('Imported memory entries: ' + parsed.length);
-          renderMemList();
-        } catch (e) { alert('Import failed: ' + (e.message || e)); }
-      });
-    }
-
-    function renderMemList() {
-      const container = byId('memList');
-      container.innerHTML = '';
-      const mem = loadMemory();
-      if (!mem.length) { container.innerHTML = '<div style="opacity:.7">No memory entries saved.</div>'; return; }
-      mem.forEach(entry => {
-        const el = document.createElement('div');
-        el.style.border = '1px solid rgba(255,255,255,0.04)';
-        el.style.padding = '10px';
-        el.style.marginBottom = '8px';
-        el.style.borderRadius = '8px';
-        el.innerHTML = `
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <div style="font-size:13px;color:var(--muted-text)">${entry.created_at}</div>
-            <div>
-              <button data-id="${entry.id}" class="editMem btn secondary-btn">Edit</button>
-              <button data-id="${entry.id}" class="delMem btn secondary-btn">Delete</button>
-            </div>
-          </div>
-          <div style="margin-top:8px"><strong>Input:</strong> <div style="font-family:monospace;background:rgba(0,0,0,0.05);padding:8px;border-radius:6px;margin-top:6px">${entry.input}</div></div>
-          <div style="margin-top:8px"><strong>Output:</strong> <div style="font-family:monospace;background:rgba(0,0,0,0.05);padding:8px;border-radius:6px;margin-top:6px">${(entry.expected_output||[]).join('\\n')}</div></div>
-        `;
-        container.appendChild(el);
-      });
-
-      // wire edit/delete
-      document.querySelectorAll('.delMem').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const id = e.currentTarget.getAttribute('data-id');
-          if (!confirm('Delete this memory entry?')) return;
-          removeMemoryById(id);
-          renderMemList();
-          updateMemoryBadge();
-        });
-      });
-      document.querySelectorAll('.editMem').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const id = e.currentTarget.getAttribute('data-id');
-          const mem = loadMemory().find(m => m.id === id);
-          if (!mem) return alert('Entry not found');
-          const newOut = prompt('Edit expected output (comma-separated):', (mem.expected_output || []).join(', '));
-          if (!newOut && newOut !== '') return;
-          const arr = newOut.split(',').map(s => s.trim()).filter(Boolean);
-          updateMemoryById(id, { expected_output: arr });
-          renderMemList();
-        });
-      });
-    }
-
-    renderMemList();
-  }
-
-  // --- Built-in mapping for old inline handlers ---
-  // Expose functions the old HTML expects
-  window.toggleMode = toggleTheme;
-  window.processNOTAM = () => parseNotamFlow(false);
-  window.aiExplain = () => parseNotamFlow(false);
-  window.aiSimplify = () => parseNotamFlow(false);
-  window.aiRisk = () => parseNotamFlow(false);
-
-  // --- Attach event listeners on DOM ready ---
-  function init() {
-    applyTheme();
-    updateMemoryBadge();
-
-    // Attach buttons
-    if (parseOfflineBtn) parseOfflineBtn.addEventListener('click', () => parseNotamFlow(true));
-    if (saveMemoryBtn) saveMemoryBtn.addEventListener('click', onSaveToMemoryClicked);
-
-    // Admin button
-    const memAdmin = byId('memoryAdminBtn');
-    if (memAdmin) memAdmin.addEventListener('click', openMemoryAdmin);
-
-    // Keyboard shortcut: Ctrl+Enter to parse
-    if (inputArea) {
-      inputArea.addEventListener('keydown', (ev) => {
-        if (ev.ctrlKey && ev.key === 'Enter') { ev.preventDefault(); parseNotamFlow(false); }
-      });
-    }
-
-    // expose for debugging
-    window.oss = {
-      parseNow: parseNotamFlow,
-      memoryList: loadMemory,
-      addMemory: (i,o) => addMemoryEntry(i,o)
-    };
-  }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
-})();
+/* Responsive */
+@media (max-width:800px){
+  .logo-title{ font-size: 1.6rem; }
+  .container{ padding: 18px; margin-top: 18px; }
+  .input-box{ min-height: 140px; }
+  .btn{ font-size: 13px; padding: 8px 12px; }
+  .memory-admin{ bottom: 12px; right: 12px; }
+}
