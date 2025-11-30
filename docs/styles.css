@@ -1,269 +1,181 @@
-/* ======================================================================
-   ONE STOP SOLUTION – NOTAM AI (Button Fix + Day/Night Top Right Fix)
-   ====================================================================== */
+/* File: one-stop-solution/docs/styles.css
+   Complete stylesheet (replace existing) — keeps theme, fixes buttons and toggle position */
 
 /* -------------------------
-    ROOT VARIABLES
+   Root variables
 -------------------------- */
-:root {
-    /* Night Mode */
-    --bg-night: linear-gradient(120deg, #3C257B 0%, #191b2e 100%);
-    --panel-night: rgba(31,32,48,0.83);
-    --text-night: #e1e8f0;
-    --btn-night: linear-gradient(95deg, #8f6ef7 10%, #554ede 88%);
-    --btn-hover-night: linear-gradient(92deg, #4e38c8, #9e88fc 65%);
-    --textarea-night: #251c3a;
-    --output-night: #251c3a;
-    --shadow-night: 0 0 25px rgba(0,0,0,0.56);
-
-    /* Day Mode */
-    --bg-day: linear-gradient(120deg, #d2e7fb 0%, #e7f5ff 100%);
-    --panel-day: #ffffff;
-    --text-day: #263154;
-    --btn-day: linear-gradient(95deg, #3c92df 10%, #bce0ff 88%);
-    --btn-hover-day: linear-gradient(92deg, #0d6efd 10%, #7ec9ff 90%);
-    --textarea-day: #f5faff;
-    --output-day: #f2f6fc;
-    --shadow-day: 0 0 18px #dbeafe77;
-
-    --radius: 12px;
-    --muted-text: #bdb8d8;
+:root{
+  --bg-night: linear-gradient(120deg,#3C257B 0%,#191b2e 100%);
+  --panel-night: rgba(31,32,48,0.83);
+  --text-night: #e1e8f0;
+  --btn-night: linear-gradient(95deg,#8f6ef7 10%,#554ede 88%);
+  --btn-hover-night: linear-gradient(92deg,#4e38c8,#9e88fc 65%);
+  --textarea-night: #251c3a;
+  --output-night: #251c3a;
+  --shadow-night: 0 0 25px rgba(0,0,0,0.56);
+  --bg-day: linear-gradient(120deg,#d2e7fb 0%,#e7f5ff 100%);
+  --panel-day: #ffffff;
+  --text-day: #263154;
+  --btn-day: linear-gradient(95deg,#3c92df 10%,#bce0ff 88%);
+  --btn-hover-day: linear-gradient(92deg,#0d6efd 10%,#7ec9ff 90%);
+  --textarea-day: #f5faff;
+  --output-day: #f2f6fc;
+  --shadow-day: 0 0 18px #dbeafe77;
+  --radius: 12px;
+  --muted-text: #bdb8d8;
 }
 
 /* -------------------------
-   GLOBAL
+   Global
 -------------------------- */
+* { box-sizing: border-box; }
 body {
-    margin: 0;
-    font-family: 'Roboto Mono', monospace;
-    background: var(--bg-night);
-    color: var(--text-night);
-    min-height: 100vh;
-    padding: 20px;
-    transition: background 0.4s ease, color 0.4s ease;
+  margin: 0;
+  font-family: 'Roboto Mono', monospace;
+  background: var(--bg-night);
+  color: var(--text-night);
+  min-height: 100vh;
+  padding: 20px;
+  transition: background .35s ease, color .35s ease;
 }
-
 body.light {
-    background: var(--bg-day);
-    color: var(--text-day);
+  background: var(--bg-day);
+  color: var(--text-day);
 }
 
 /* -------------------------
-   DAY/NIGHT BUTTON (TOP RIGHT)
+   Day/Night Toggle (top-right)
 -------------------------- */
 .toggle-mode {
-    position: fixed;
-    top: 12px;
-    right: 12px;
-    z-index: 999;
-    background: rgba(255,255,255,0.15);
-    border: 1px solid rgba(255,255,255,0.2);
-    padding: 10px 14px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 16px;
-    color: var(--muted-text);
-    backdrop-filter: blur(4px);
-    transition: 0.3s;
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 999;
+  background: rgba(255,255,255,0.14);
+  border: 1px solid rgba(255,255,255,0.18);
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--muted-text);
+  backdrop-filter: blur(4px);
 }
+.toggle-mode:hover { transform: translateY(-1px); }
 
-.toggle-mode:hover {
-    background: rgba(255,255,255,0.25);
-}
-
+/* light mode toggle tweak */
 body.light .toggle-mode {
-    background: rgba(0,0,0,0.05);
-    color: #375e94;
-    border: 1px solid #bcd4f9;
+  background: rgba(0,0,0,0.04);
+  border: 1px solid #bcd4f9;
+  color: #375e94;
 }
 
 /* -------------------------
-   HEADER
+   Header
 -------------------------- */
 .logo-bar {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 14px;
-    margin-top: 60px;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:14px;
+  margin-top: 60px;
 }
-
-.logo-img {
-    width: 74px;
-    height: 74px;
-    object-fit: contain;
-    border-radius: 12px;
-    box-shadow: 0 0 14px rgba(0,0,0,0.28);
-}
-
-.logo-title {
-    font-family: 'Orbitron', monospace;
-    font-size: 2.1rem;
-    font-weight: bold;
-    letter-spacing: 2px;
-}
-
-body.light .logo-title {
-    color: #274070;
-}
+.logo-img { width:74px; height:74px; object-fit:contain; border-radius:12px; box-shadow:0 0 14px rgba(0,0,0,0.28); }
+.logo-title { font-family:'Orbitron', monospace; font-size:2.1rem; font-weight:700; letter-spacing:2px; }
+body.light .logo-title { color:#274070; }
 
 /* -------------------------
-   CONTAINER
+   Container
 -------------------------- */
 .container {
-    width: 95%;
-    max-width: 960px;
-    margin: 35px auto;
-    background: var(--panel-night);
-    padding: 28px;
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-night);
-    transition: 0.3s;
+  width:95%;
+  max-width:960px;
+  margin:35px auto;
+  background: var(--panel-night);
+  padding:28px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-night);
+  transition: .3s;
 }
-
-body.light .container {
-    background: var(--panel-day);
-    box-shadow: var(--shadow-day);
-}
+body.light .container { background: var(--panel-day); box-shadow: var(--shadow-day); }
 
 /* -------------------------
-   INPUT TEXTAREA
+   Input textarea
 -------------------------- */
-.input-box,
-textarea#notamInput {
-    width: 100%;
-    min-height: 180px;
-    padding: 16px;
-    background: var(--textarea-night);
-    color: var(--text-night);
-    border: none;
-    border-radius: var(--radius);
-    resize: vertical;
-    font-family: inherit;
-    box-shadow: inset 0 0 8px #3f2876;
-    transition: 0.3s;
+.input-box, textarea#notamInput {
+  width:100%;
+  min-height:180px;
+  padding:16px;
+  background: var(--textarea-night);
+  color: var(--text-night);
+  border-radius: var(--radius);
+  border:none;
+  resize: vertical;
+  font-family:inherit;
+  box-shadow: inset 0 0 8px #3f2876;
+  transition:.25s;
 }
-
 body.light textarea#notamInput {
-    background: var(--textarea-day);
-    color: var(--text-day);
-    box-shadow: inset 0 0 10px #bde0ff;
+  background: var(--textarea-day);
+  color: var(--text-day);
+  box-shadow: inset 0 0 10px #bde0ff;
 }
 
 /* -------------------------
-   BUTTONS (FULL FIX)
+   Buttons (fixed)
 -------------------------- */
-
-/* Button base */
+/* base */
 .btn {
-    padding: 12px 22px;
-    border-radius: var(--radius);
-    cursor: pointer;
-    font-family: 'Orbitron', monospace;
-    border: none;
-    color: white;
-    transition: 0.25s ease;
-    background: var(--btn-night);
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: 'Orbitron', monospace;
+  border: none;
+  color: white;
+  transition: background .18s ease, transform .08s ease;
+  background: var(--btn-night);
 }
+.btn:hover { transform: translateY(-2px); background: var(--btn-hover-night); }
 
-.btn:hover {
-    background: var(--btn-hover-night);
-}
+/* primary / secondary */
+.primary-btn { font-weight: 700; }
+.secondary-btn { opacity: .9; background: rgba(255,255,255,0.06); color: var(--text-night); box-shadow: none; }
+.secondary-btn:hover { opacity: 1; background: rgba(255,255,255,0.09); }
 
-/* Light mode */
-body.light .btn {
-    background: var(--btn-day);
-    color: #00275b;
-}
-
-body.light .btn:hover {
-    background: var(--btn-hover-day);
-}
-
-/* Primary & secondary styling */
-.primary-btn {
-    font-weight: bold;
-}
-
-.secondary-btn {
-    opacity: 0.82;
-}
-
-.secondary-btn:hover {
-    opacity: 1;
-}
+/* light mode buttons */
+body.light .btn { background: var(--btn-day); color: #00275b; }
+body.light .btn:hover { background: var(--btn-hover-day); }
+body.light .secondary-btn { background: rgba(0,0,0,0.04); color: var(--text-day); }
 
 /* -------------------------
-   BUTTON ROW
+   Button row & memory area
 -------------------------- */
-.btn-row {
-    margin-top: 16px;
-    margin-bottom: 12px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-}
+.btn-row { margin-top:16px; margin-bottom:12px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.memory-box { margin-top:10px; display:flex; align-items:center; gap:8px; }
+
+/* memory badge */
+#memoryBadge { font-size: 0.9rem; opacity: .75; color: var(--muted-text); }
 
 /* -------------------------
-   MEMORY
+   Output
 -------------------------- */
-.memory-box {
-    margin-top: 14px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
+.output-box, pre#notamOutput {
+  margin-top:14px;
+  padding:16px;
+  min-height:140px;
+  background: var(--output-night);
+  border-radius: var(--radius);
+  white-space: pre-wrap;
+  font-size:14px;
+  border:1px solid rgba(255,255,255,0.05);
+  box-shadow: inset 0 0 8px #7458ff44;
+  transition:.25s;
 }
-
-#memoryBadge {
-    font-size: 0.9rem;
-    opacity: 0.7;
-}
-
-/* -------------------------
-   OUTPUT BOX
--------------------------- */
-.output-box,
-pre#notamOutput {
-    margin-top: 14px;
-    padding: 16px;
-    min-height: 140px;
-    background: var(--output-night);
-    border-radius: var(--radius);
-    white-space: pre-wrap;
-    font-size: 14px;
-    border: 1px solid rgba(255,255,255,0.05);
-    box-shadow: inset 0 0 8px #7458ff44;
-    transition: 0.3s;
-}
-
-body.light pre#notamOutput {
-    background: var(--output-day);
-    border: 1px solid rgba(0,0,0,0.06);
-    box-shadow: inset 0 0 4px #e1e6fa;
-    color: var(--text-day);
-}
+body.light .output-box { background: var(--output-day); border:1px solid rgba(0,0,0,0.06); box-shadow: inset 0 0 4px #e1e6fa; color: var(--text-day); }
 
 /* -------------------------
-   FOOTER
--------------------------- */
-footer {
-    margin-top: 18px;
-    text-align: center;
-    font-size: 13px;
-    opacity: 0.6;
-}
-
-/* -------------------------
-   RESPONSIVE
+   Responsive
 -------------------------- */
 @media (max-width: 600px) {
-    .btn-row {
-        flex-direction: column;
-    }
-    .btn {
-        width: 100%;
-    }
-    .logo-title {
-        font-size: 1.6rem;
-    }
+  .btn-row { flex-direction: column; }
+  .btn { width:100%; }
+  .logo-title { font-size: 1.6rem; }
 }
