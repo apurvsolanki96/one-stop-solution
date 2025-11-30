@@ -1,47 +1,38 @@
 /* ============================================================
-   ONE STOP SOLUTION – FLIGHTSCAPE NOTAM AI PROCESSOR
-   Production styles — Batch E
+   ONE STOP SOLUTION – NOTAM AI (NEW UI VERSION)
+   COMPLETE REPLACEMENT CSS
    ============================================================ */
 
 /* -------------------------
     ROOT VARIABLES
 -------------------------- */
 :root {
-    /* Day/Night backgrounds */
+    /* Night Mode */
     --bg-night: linear-gradient(120deg, #3C257B 0%, #191b2e 100%);
-    --bg-day: linear-gradient(120deg, #d2e7fb 0%, #e7f5ff 100%);
-
-    /* Panels */
     --panel-night: rgba(31,32,48,0.83);
-    --panel-day: #ffffff;
-
-    /* Colors */
     --text-night: #e1e8f0;
-    --text-day: #263154;
-
-    /* Buttons */
     --btn-night: linear-gradient(95deg, #8f6ef7 10%, #554ede 88%);
     --btn-hover-night: linear-gradient(92deg, #4e38c8, #9e88fc 65%);
+    --textarea-night: #251c3a;
+    --output-night: #251c3a;
+    --shadow-night: 0 0 25px rgba(0,0,0,0.56);
+
+    /* Day Mode */
+    --bg-day: linear-gradient(120deg, #d2e7fb 0%, #e7f5ff 100%);
+    --panel-day: #ffffff;
+    --text-day: #263154;
     --btn-day: linear-gradient(95deg, #3c92df 10%, #bce0ff 88%);
     --btn-hover-day: linear-gradient(92deg, #0d6efd 10%, #7ec9ff 90%);
-
-    /* Textarea */
-    --textarea-night: #251c3a;
-    --textarea-text-night: #d0dffb;
     --textarea-day: #f5faff;
-    --textarea-text-day: #283048;
-
-    /* Output */
-    --output-night: #251c3a;
     --output-day: #f2f6fc;
+    --shadow-day: 0 0 18px #dbeafe77;
 
     --radius: 12px;
-    --shadow-night: 0 0 25px rgba(0,0,0,0.56);
-    --shadow-day: 0 0 18px #dbeafe77;
+    --muted-text: #bdb8d8;
 }
 
 /* -------------------------
-   GLOBAL
+   GLOBAL STYLES
 -------------------------- */
 body {
     margin: 0;
@@ -50,36 +41,12 @@ body {
     color: var(--text-night);
     min-height: 100vh;
     padding: 20px;
-    transition: background 0.5s ease, color 0.5s ease;
+    transition: background 0.4s ease, color 0.4s ease;
 }
 
-body.day {
+body.light {
     background: var(--bg-day);
     color: var(--text-day);
-}
-
-/* -------------------------
-   TOGGLE BUTTON
--------------------------- */
-.toggle-mode {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    padding: 10px 14px;
-    border-radius: 18px;
-    border: 1px solid #3d3181;
-    background: #221f3a;
-    color: #ffffff;
-    font-family: 'Orbitron', monospace;
-    cursor: pointer;
-    z-index: 50;
-    transition: 0.3s;
-}
-
-body.day .toggle-mode {
-    background: #eeeefa;
-    color: #00275b;
-    border: 1px solid #b9d4fd;
 }
 
 /* -------------------------
@@ -106,19 +73,18 @@ body.day .toggle-mode {
     font-size: 2.1rem;
     font-weight: bold;
     letter-spacing: 2px;
-    color: white;
 }
 
-body.day .logo-title {
+body.light .logo-title {
     color: #274070;
 }
 
 /* -------------------------
-   MAIN PANEL
+   CONTAINER
 -------------------------- */
 .container {
     width: 95%;
-    max-width: 900px;
+    max-width: 960px;
     margin: 35px auto;
     background: var(--panel-night);
     padding: 28px;
@@ -127,21 +93,21 @@ body.day .logo-title {
     transition: 0.3s;
 }
 
-body.day .container {
+body.light .container {
     background: var(--panel-day);
     box-shadow: var(--shadow-day);
 }
 
 /* -------------------------
-   TEXTAREA
+   TEXTAREA (NOTAM INPUT)
 -------------------------- */
-textarea {
+textarea#notamInput {
     width: 100%;
-    min-height: 170px;
-    padding: 12px;
+    min-height: 180px;
+    padding: 16px;
     background: var(--textarea-night);
-    color: var(--textarea-text-night);
-    font-family: 'Roboto Mono', monospace;
+    color: var(--text-night);
+    font-family: inherit;
     border-radius: var(--radius);
     border: none;
     resize: vertical;
@@ -149,123 +115,114 @@ textarea {
     transition: 0.3s;
 }
 
-body.day textarea {
+body.light textarea#notamInput {
     background: var(--textarea-day);
-    color: var(--textarea-text-day);
+    color: var(--text-day);
     box-shadow: inset 0 0 10px #bde0ff;
 }
 
 /* -------------------------
    BUTTONS
 -------------------------- */
-button {
+.controls button {
     background: var(--btn-night);
     border: none;
-    padding: 12px 28px;
-    color: white;
+    padding: 12px 22px;
     font-family: 'Orbitron', monospace;
     border-radius: var(--radius);
     cursor: pointer;
+    color: white;
     transition: 0.3s;
 }
 
-button:hover {
+.controls button:hover {
     background: var(--btn-hover-night);
 }
 
-body.day button {
+body.light .controls button {
     background: var(--btn-day);
     color: #00275b;
 }
 
-body.day button:hover {
+body.light .controls button:hover {
     background: var(--btn-hover-day);
-    color: #01325a;
 }
 
-.btn-row {
+/* Theme Button Special */
+#btnThemeToggle {
+    background: transparent !important;
+    border: 1px solid rgba(255,255,255,0.2);
+    color: var(--muted-text);
+}
+
+body.light #btnThemeToggle {
+    border: 1px solid #bcd4f9;
+    color: #375e94;
+}
+
+/* -------------------------
+   CONTROLS ROW
+-------------------------- */
+.controls {
+    margin-top: 16px;
+    margin-bottom: 12px;
     display: flex;
-    gap: 10px;
     flex-wrap: wrap;
-    margin-top: 18px;
+    gap: 10px;
+}
+
+/* -------------------------
+   MEMORY BADGE
+-------------------------- */
+#memoryBadge {
+    font-size: 0.9rem;
+    opacity: 0.7;
+    padding-left: 10px;
 }
 
 /* -------------------------
    OUTPUT BOX
 -------------------------- */
-.out-title {
-    font-family: 'Orbitron';
-    margin-top: 30px;
-    font-size: 1.3rem;
-    letter-spacing: 1px;
-    color: #a9bfff;
-}
-
-body.day .out-title {
-    color: #335487;
-}
-
-#output {
-    margin-top: 12px;
+pre#notamOutput {
+    margin-top: 14px;
     padding: 16px;
-    min-height: 150px;
+    min-height: 140px;
     background: var(--output-night);
     border-radius: var(--radius);
     white-space: pre-wrap;
-    box-shadow: inset 0 0 8px #7458ff44;
     font-size: 14px;
+    border: 1px solid rgba(255,255,255,0.05);
+    box-shadow: inset 0 0 8px #7458ff44;
     transition: 0.3s;
 }
 
-body.day #output {
+body.light pre#notamOutput {
     background: var(--output-day);
+    border: 1px solid rgba(0,0,0,0.06);
     box-shadow: inset 0 0 4px #e1e6fa;
+    color: var(--text-day);
 }
 
 /* -------------------------
-   MEMORY BAR
+   FOOTER
 -------------------------- */
-.memory-box {
+footer {
     margin-top: 18px;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-}
-
-#memoryStatus {
-    font-size: 0.9rem;
-    opacity: 0.8;
+    text-align: center;
+    font-size: 13px;
+    opacity: 0.6;
 }
 
 /* -------------------------
-   COPY NOTICE
--------------------------- */
-.copy-notice {
-    margin-top: 12px;
-    display: inline-block;
-    font-size: 14px;
-    color: #7ef59c;
-    opacity: 0;
-    transition: opacity 0.4s;
-}
-
-body.day .copy-notice {
-    color: #008e34;
-}
-
-.copy-notice.visible {
-    opacity: 1;
-}
-
-/* -------------------------
-   RESPONSIVE
+   RESPONSIVE DESIGN
 -------------------------- */
 @media (max-width: 600px) {
-    .btn-row {
+    .controls {
         flex-direction: column;
+        align-items: stretch;
     }
 
-    button {
+    .controls button {
         width: 100%;
     }
 
