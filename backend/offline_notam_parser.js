@@ -1,346 +1,340 @@
-/**
- * backend/offline_notam_parser.js
- *
- * Offline NOTAM airway (AWY) extractor + "memory" learning fallback.
- *
- * Usage:
- *  node offline_notam_parser.js parse "<NOTAM TEXT HERE>"
- *  node offline_notam_parser.js parse-file path/to/notam.txt
- *  node offline_notam_parser.js add-memory "<NOTAM TEXT>" "<EXPECTED_OUTPUT_JSON_ARRAY>"
- *
- * Memory file: ./memory.json
- *
- * Output format (normalized strings): e.g.
- *   "L736 NEDRA-GOMED FL045-FL130"
- *   "W187 TUSLI-DNH FL000-FL341"
- *
- * Keep simple, purely local — no web calls.
- *
- * Author: Code Copilot (assistant)
- */
+#!/usr/bin/env python3
+"""
+Enhanced offline NOTAM parser (updated to handle user examples)
 
-const fs = require('fs');
-const path = require('path');
+Features:
+- Extracts ATS route closures and outputs standardized lines:
+    <ROUTE> <POINT1>-<POINT2> FLxxx-FLxxx
+- Priority for flight levels:
+    1) inline AWY FL on route line
+    2) F) and G) fields
+    3) Q-line LLL/UUU
+- Handles "FROM GND TO FLxxx", "FM FL000 TO FL167", "FROM FL000 TO FL301", "GND-FL999"
+- Parses meters (e.g., 10,400M), ranges using "AND", "BTN ... AND ..."
+- Converts meters→FL and caps by Q-line upper if present
+- Treats SFC/GND as FL000
+- Handles comma-separated AWY lists and multi-line lists
+- Normalizes waypoint names like "NDB (BD)" -> "BD", "VOR 'JIG'" -> "JIG"
+- Implements rule: "RAISED TO FLxxx" -> cap upper FL to (FLxxx - 5)
+- Outputs JSON and plain lines; writes <file>.parsed.json when used on a file
+"""
 
-const MEMORY_PATH = path.join(__dirname, 'memory.json');
+import re, sys, json
+from math import floor
 
-/* ===========================
-   Utilities
-   =========================== */
-function ensureMemoryFile() {
-  if (!fs.existsSync(MEMORY_PATH)) {
-    fs.writeFileSync(MEMORY_PATH, JSON.stringify([], null, 2), 'utf8');
-  }
-}
-function readMemory() {
-  ensureMemoryFile();
-  return JSON.parse(fs.readFileSync(MEMORY_PATH, 'utf8'));
-}
-function writeMemory(arr) {
-  fs.writeFileSync(MEMORY_PATH, JSON.stringify(arr, null, 2), 'utf8');
-}
-function addMemoryEntry(entry) {
-  const mem = readMemory();
-  mem.push(entry);
-  writeMemory(mem);
-}
+# ---------------------------
+# Utilities
+# ---------------------------
+def meters_to_fl(meters):
+    return int(round(meters / 30.48))
 
-/* ===========================
-   Normalizers
-   =========================== */
-function padFL(numStr) {
-  // Accept "FL45", "FL045", "45", "045" etc.
-  if (!numStr) return null;
-  numStr = String(numStr).toUpperCase().replace(/^FL/, '').replace(/\D/g, '');
-  if (!numStr) return null;
-  return 'FL' + numStr.padStart(3, '0');
-}
-function normalizeSegment(awy, fromNode, toNode, fromFL, toFL) {
-  const awyNorm = awy ? awy.toUpperCase().replace(/\s+/g, '') : '';
-  const nodes = [ (fromNode||'').trim(), (toNode||'').trim() ]
-    .filter(Boolean)
-    .join('-');
-  const flFrom = padFL(fromFL);
-  const flTo = padFL(toFL);
-  const flPart = (flFrom && flTo) ? ` ${flFrom}-${flTo}` : (flFrom ? ` ${flFrom}` : '');
-  const main = (awyNorm || nodes) ? `${awyNorm}${awyNorm && nodes ? ' ' : ''}${nodes}${flPart}` : null;
-  return main ? main.trim() : null;
-}
+def feet_to_fl(feet):
+    return int(round(feet / 100.0))
 
-/* ===========================
-   Regex-based extractors
-   =========================== */
+def fmt_fl(fl):
+    if fl is None:
+        return "UNK"
+    return f"FL{int(fl):03d}"
 
-const AWY_CODE_RE = /\b([A-Z]\d{1,4}|[A-Z]{1,3}\d{1,3})\b/; // simple AWY-like (L736, W187, A822, etc.)
+def normalize_ident(s):
+    if not s:
+        return s
+    t = s.strip().upper()
+    # remove descriptors
+    t = re.sub(r"VORDME|VOR|NDB|DME", "", t)
+    # remove parentheses and quotes and punctuation except hyphen
+    t = re.sub(r"[()\']", "", t)
+    t = re.sub(r"[^A-Z0-9\-]", " ", t)
+    t = re.sub(r"\s+", "", t)
+    return t
 
-function extractFromOPBlock(text) {
-  // O/P: lines often already in desired format (one-per-line), try to find O/P: and take following lines
-  const opMatch = text.match(/O\/P:\s*([\s\S]+)/i);
-  if (!opMatch) return [];
-  const opText = opMatch[1].trim();
-  // Split by newline or multiple spaces / semicolon
-  const lines = opText.split(/\r?\n|;|\u00A0/).map(s => s.trim()).filter(Boolean);
-  const out = [];
-  for (let ln of lines) {
-    // Common pattern: AWY N1-N2 FLnnn-FLnnn
-    // Examples in your data: "L736 NEDRA-GOMED FL045-FL130", "W187 TUSLI-DNH FL000-FL341"
-    const m = ln.match(/([A-Z]\d{1,4}|[A-Z]{1,3}\d{1,3})\s+([A-Z0-9'()\- ]+?)\s+FL?(\d{1,3})\s*[-\u2013]\s*FL?(\d{1,3})/i);
-    if (m) {
-      out.push(normalizeSegment(m[1], ...m[2].split(/\s*-\s*/), m[3], m[4]));
-      continue;
+# ---------------------------
+# Extract Q-line (priority 3)
+# ---------------------------
+def extract_q_limits(text):
+    # Common Q line: .../E/240/310/...
+    m = re.search(r'\bQ\)[^/]*?/[^/]*?/[^/]*?/[^/]*?/(\d{1,3})/(\d{1,3})/', text)
+    if m:
+        return int(m.group(1)), int(m.group(2))
+    m2 = re.search(r'\bQ\)[\s\S]*?/E/(\d{1,3})/(\d{1,3})', text)
+    if m2:
+        return int(m2.group(1)), int(m2.group(2))
+    return None, None
+
+# ---------------------------
+# Extract F) and G) fields (priority 2)
+# ---------------------------
+def extract_f_g(text):
+    f=None; g=None
+    m_f = re.search(r'\bF\)\s*([^\n\r]+)', text)
+    m_g = re.search(r'\bG\)\s*([^\n\r]+)', text)
+    def parse_token(tok):
+        if not tok: return None
+        tok = tok.strip().upper()
+        if tok in ("GND","SFC"):
+            return 0
+        mfl = re.search(r'FL\s*(\d{1,3})', tok)
+        if mfl: return int(mfl.group(1))
+        m_m = re.search(r'(\d{3,6})M\b', tok)
+        if m_m: return meters_to_fl(int(m_m.group(1)))
+        m_ft = re.search(r'(\d{3,6})FT\b', tok)
+        if m_ft: return feet_to_fl(int(m_ft.group(1)))
+        # bare digits
+        m2 = re.search(r'\b(\d{1,3})\b', tok)
+        if m2: return int(m2.group(1))
+        return None
+    if m_f: f = parse_token(m_f.group(1))
+    if m_g: g = parse_token(m_g.group(1))
+    return f,g
+
+# ---------------------------
+# Parse "RAISED TO FLxxx" special rule
+# ---------------------------
+def extract_raised_to(text):
+    m = re.search(r'RAISED TO FL\s*(\d{1,3})', text, re.IGNORECASE)
+    if m:
+        return int(m.group(1))
+    return None
+
+# ---------------------------
+# Find AWY/route segments - handles lists and multi-line comma separated entries
+# ---------------------------
+def find_segments(text):
+    segs = []
+    # normalize commas that separate items across lines
+    # We will find patterns like "AWY L321 KUNKI/OBRAN," or lines listing AWYs multiple items separated by commas
+    # First, split E) section or full text
+    # Look for E) section
+    e_section = text
+    m_e = re.search(r'\bE\)([\s\S]+)$', text)
+    if m_e:
+        e_section = m_e.group(1)
+    # split by lines, but also treat commas as separators inside E section
+    # Replace sequences like 'AWY ' start markers preceded by comma with newline to split lists
+    normalized = re.sub(r',\s*AWY', '\nAWY', e_section, flags=re.IGNORECASE)
+    # Also replace commas followed by route codes or uppercase patterns with newline
+    normalized = re.sub(r',\s*([A-Z]{1,3}\d{0,4}\b)', r'\n\1', normalized)
+    lines = normalized.splitlines()
+    # pattern for route code + pair e.g. L736 NEDRA-GOMED FL045-FL130
+    route_re = re.compile(r'\b([A-Z]{1,2}(?:/[A-Z]{1,2})?\d{0,4})\b', re.IGNORECASE)
+    pair_re = re.compile(r'([A-Z0-9\'\(\)\s\-]+?)\s*-\s*([A-Z0-9\'\(\)\s\-]+)', re.IGNORECASE)
+    # Additional patterns for forms like "L736 NEDRA-GOMED FL045-FL130" or "L736  NEDRA-GOMED FL045-FL130"
+    for ln in lines:
+        ln2 = ln.strip()
+        if not ln2:
+            continue
+        # sometimes list entries don't include explicit AWY token; try to find route + waypoint pair
+        # remove leading list numbers "1." "2."
+        ln2 = re.sub(r'^\d+\.\s*', '', ln2)
+        # find route code (may be 'AWY L321' or 'L321' alone)
+        rt = None
+        m = re.search(r'\bAWY\s+([A-Z]{1,2}(?:/[A-Z]{1,2})?\d{1,4})', ln2, re.IGNORECASE)
+        if m:
+            rt = m.group(1).upper()
+        else:
+            m2 = route_re.search(ln2)
+            if m2:
+                rt = m2.group(1).upper()
+        # find pair
+        pair = pair_re.search(ln2)
+        if pair:
+            wp1 = normalize_ident(pair.group(1))
+            wp2 = normalize_ident(pair.group(2))
+        else:
+            # sometimes format is "L321 KUNKI/OBRAN" with slash instead of hyphen
+            mslash = re.search(r'([A-Z0-9]+)\s+([A-Z0-9]+)/([A-Z0-9]+)', ln2)
+            if mslash:
+                wp1 = normalize_ident(mslash.group(2))
+                wp2 = normalize_ident(mslash.group(3))
+            else:
+                # also handle "BTN X AND Y" or "X TO Y"
+                mbtn = re.search(r'BTN\s+([A-Z0-9\'\s]+)\s+AND\s+([A-Z0-9\'\s]+)', ln2, re.IGNORECASE)
+                if mbtn:
+                    wp1 = normalize_ident(mbtn.group(1))
+                    wp2 = normalize_ident(mbtn.group(2))
+                else:
+                    mto = re.search(r'([A-Z0-9\'\s]+)\s+TO\s+([A-Z0-9\'\s]+)', ln2, re.IGNORECASE)
+                    if mto:
+                        # choose earlier tokens that look like idents
+                        wp1 = normalize_ident(mto.group(1).split()[-1])
+                        wp2 = normalize_ident(mto.group(2).split()[-1])
+                    else:
+                        # fallback: skip
+                        continue
+        # inline FL on same line?
+        fl_low = fl_high = None
+        # patterns: "FL045-FL130" or "FL045/FL130" or "FL000 TO FL167" or "FROM FL000 TO FL351"
+        mfl = re.search(r'FL\s*(\d{1,3})\s*[-\/]\s*FL\s*(\d{1,3})', ln2, re.IGNORECASE)
+        if mfl:
+            fl_low = int(mfl.group(1)); fl_high = int(mfl.group(2))
+        else:
+            mfl2 = re.search(r'FROM\s+FL\s*(\d{1,3})\s+TO\s+FL\s*(\d{1,3})', ln2, re.IGNORECASE)
+            if mfl2:
+                fl_low = int(mfl2.group(1)); fl_high = int(mfl2.group(2))
+            else:
+                mfl3 = re.search(r'FM\s*FL\s*(\d{1,3})\s*TO\s*FL\s*(\d{1,3})', ln2, re.IGNORECASE)
+                if mfl3:
+                    fl_low = int(mfl3.group(1)); fl_high = int(mfl3.group(2))
+        # meters inline: "AT 10,400M AND BELOW" or "BTN 6,300M AND 9,200M"
+        meters = re.findall(r'(\d{1,3}(?:,\d{3})?)\s*M', ln2, re.IGNORECASE)
+        meters = [int(m.replace(',', '')) for m in meters] if meters else []
+        # feet inline
+        feet = re.findall(r'(\d{1,6})\s*FT', ln2, re.IGNORECASE)
+        feet = [int(f) for f in feet] if feet else []
+        segs.append({
+            "route": rt,
+            "wp1": wp1,
+            "wp2": wp2,
+            "line_fl_low": fl_low,
+            "line_fl_high": fl_high,
+            "meters": meters,
+            "feet": feet,
+            "raw": ln2
+        })
+    return segs
+
+# ---------------------------
+# Determine FL for segment using priority rules
+# ---------------------------
+def choose_fl(seg, f_g, q_limits, raised_to=None):
+    q_low, q_high = q_limits
+    f_limit, g_limit = f_g
+    # 1) AWY line FL
+    if seg.get("line_fl_low") is not None and seg.get("line_fl_high") is not None:
+        low = seg["line_fl_low"]; high = seg["line_fl_high"]
+    # 2) F/G fields
+    elif f_limit is not None or g_limit is not None:
+        low = f_limit if f_limit is not None else (q_low if q_low is not None else 0)
+        high = g_limit if g_limit is not None else (q_high if q_high is not None else low)
+    # 3) Q-line and meters/feet conversions
+    else:
+        # if meters specified, convert them
+        if seg.get("meters"):
+            # heuristics: if two meters values given, use min as low, max as high. if single value and phrasing '...AND BELOW' assume low=0
+            mlist = sorted(seg["meters"])
+            if len(mlist) >= 2:
+                low = meters_to_fl(mlist[0]); high = meters_to_fl(mlist[-1])
+            else:
+                # single meter value -> typically "AT X M AND BELOW" -> low = 0 ; high = converted value
+                low = 0
+                high = meters_to_fl(mlist[0])
+        elif seg.get("feet"):
+            flist = sorted(seg["feet"])
+            if len(flist) >= 2:
+                low = feet_to_fl(flist[0]); high = feet_to_fl(flist[-1])
+            else:
+                low = 0
+                high = feet_to_fl(flist[0])
+        else:
+            # fallback to Q-line if present
+            if q_low is not None and q_high is not None:
+                low = q_low; high = q_high
+            else:
+                # unknown -> default to GND-FL999
+                low = 0; high = 999
+    # cap by Q-line upper if present
+    if q_high is not None and high is not None:
+        high = min(high, q_high)
+        low = max(low, q_low) if q_low is not None else low
+    # apply RAISED TO FLxxx rule: reduce upper by 5 FL if raised_to present
+    if raised_to is not None and isinstance(raised_to, int):
+        cap = raised_to - 5
+        if high is not None:
+            high = min(high, cap)
+    return low, high
+
+# ---------------------------
+# Expand dual designators like 'L/UL851' -> ['L851','UL851']
+# ---------------------------
+def expand_route_variants(rt):
+    if not rt:
+        return []
+    rt = rt.replace(" ", "")
+    m = re.match(r'^([A-Z]{1,2})/([A-Z]{1,2})(\d{1,4})$', rt)
+    if m:
+        a,b,num = m.groups()
+        return [f"{a}{num}", f"{b}{num}"]
+    # if pattern like 'L/UL 851' we might get route= 'L/UL' and digits elsewhere, but our find_segments will usually capture digits in route token
+    m2 = re.match(r'^([A-Z]{1,2}\d{1,4})$', rt)
+    if m2:
+        return [rt]
+    # fallback return route token as-is
+    return [rt]
+
+# ---------------------------
+# High-level parse function
+# ---------------------------
+def parse_notam(text):
+    text = text.replace("\r\n", "\n")
+    q_limits = extract_q_limits(text)
+    f_g = extract_f_g(text)
+    raised_to = extract_raised_to(text)
+    segments = find_segments(text)
+    outputs = []
+    details = []
+    for s in segments:
+        rt = s.get("route")
+        variants = expand_route_variants(rt)
+        low, high = choose_fl(s, f_g, q_limits, raised_to=raised_to)
+        for v in variants:
+            out = f"{v} {s['wp1']}-{s['wp2']} {fmt_fl(low)}-{fmt_fl(high)}"
+            outputs.append(out)
+        details.append({
+            "route_token": rt,
+            "variants": variants,
+            "wp1": s['wp1'],
+            "wp2": s['wp2'],
+            "low": low,
+            "high": high,
+            "raw": s['raw'],
+            "meters": s.get("meters"),
+            "feet": s.get("feet")
+        })
+    # deduplicate preserve order
+    seen=set(); uniq=[]
+    for o in outputs:
+        if o not in seen:
+            uniq.append(o); seen.add(o)
+    return {
+        "q_limits":{"low": q_limits[0], "high": q_limits[1]},
+        "f_g":{"F": f_g[0], "G": f_g[1]},
+        "raised_to": raised_to,
+        "outputs": uniq,
+        "details": details
     }
-    // Or: "W187 TUSLI-KARVI FL000-FL157W112 TUSLI-VIKUP FL000-FL157" -> split by whitespace between segments
-    const segs = ln.split(/\s{2,}|\s(?=[A-Z]\d{1,4}\s)|\u00A0/).map(s => s.trim()).filter(Boolean);
-    for (let s of segs) {
-      const mm = s.match(/([A-Z]\d{1,4}|[A-Z]{1,3}\d{1,3})\s+([A-Z0-9'()\- ]+?)\s+FL?(\d{1,3})\s*[-\u2013]\s*FL?(\d{1,3})/i);
-      if (mm) out.push(normalizeSegment(mm[1], ...mm[2].split(/\s*-\s*/), mm[3], mm[4]));
-    }
-  }
-  return out.filter(Boolean);
-}
 
-function extractSegmentsFromE(text) {
-  // Many NOTAMs contain E) followed by human-readable descriptions of closed segments.
-  // We'll try to capture patterns like:
-  //   "FLW ATS RTE SEGMENTS CLSD:L736 NEDRA-GOMED FL045-FL130N5 KALININGRAD/KHRABROVO VORDME(KRD)-GITOV FL045-FL130."
-  // Strategy:
-  //  - Extract text after E) up to O/P: (if present) or end
-  //  - Find multiple matches of: <AWYcode> <node>-<node> FLxxx-FLyyy
-  const eMatch = text.match(/E\)\s*([\s\S]+?)(?:O\/P:|$)/i);
-  const subject = eMatch ? eMatch[1] : text;
-  const out = [];
-  // global match for patterns AWY ... FLnnn-FLnnn
-  const regex = /([A-Z]\d{1,4}|[A-Z]{1,3}\d{1,3})\s+([A-Z0-9'()\/\-\.\s]+?)\s+FL?(\d{1,3})\s*[-\u2013]\s*FL?(\d{1,3})/gmi;
-  let m;
-  while ((m = regex.exec(subject)) !== null) {
-    // m[2] might contain multiple nodes separated by comma or ' ' or other - pick first pair with '-'
-    const nodeText = m[2].trim();
-    // try to pull from patterns like "NEDRA-GOMED" or "TUSLI - DUNHUANG VOR'DNH' OF ATS RTE W187 CLSD AT 10,400M..." so be flexible:
-    const nodePairMatch = nodeText.match(/([A-Z0-9'()\/]+(?:-[A-Z0-9'()\/]+))/i);
-    let fromNode = null, toNode = null;
-    if (nodePairMatch) {
-      const nodes = nodePairMatch[1].split(/\s*-\s*/);
-      fromNode = nodes[0];
-      toNode = nodes[1];
-    } else {
-      // fallback: take token sequence and try split by space and '-'
-      const tokens = nodeText.split(/\s+/);
-      if (tokens.length >= 3 && tokens[1].includes('-')) {
-        const nodes = tokens[1].split('-');
-        fromNode = nodes[0]; toNode = nodes[1];
-      } else {
-        // try splitting nodeText on '-' or '/'
-        const sp = nodeText.split(/\s*-\s*/);
-        if (sp.length >= 2) {
-          fromNode = sp[0]; toNode = sp[1];
-        } else {
-          // last resort, set whole nodeText as single node
-          fromNode = nodeText.trim();
-        }
-      }
-    }
-    const normalized = normalizeSegment(m[1], fromNode, toNode, m[3], m[4]);
-    if (normalized) out.push(normalized);
-  }
-
-  // Additional heuristic: phrases like "FROM FL000 TO FL351" + "W112 TUSLI-VIKUP" might appear separately.
-  // Attempt to capture blocks like "<AWY> <nodes> FROM FLx TO FLy" too.
-  const regex2 = /([A-Z]\d{1,4}|[A-Z]{1,3}\d{1,3})\s+([A-Z0-9'()\/\-\s]+?)\s*[,:\.]*\s*FROM\s+FL?(\d{1,3})\s*(?:TO|-)\s*FL?(\d{1,3})/gmi;
-  while ((m = regex2.exec(subject)) !== null) {
-    const nodes = m[2].trim();
-    const parts = nodes.split(/\s*-\s*/);
-    const normalized = normalizeSegment(m[1], parts[0], parts[1] || '', m[3], m[4]);
-    if (normalized) out.push(normalized);
-  }
-
-  return Array.from(new Set(out.filter(Boolean)));
-}
-
-function extractSegmentsGeneric(text) {
-  // Generic fallback: find patterns like "<AWYcode> <SOMETHING> FLnn-FLnn" across the text
-  const out = [];
-  const regex = /([A-Z]\d{1,4}|[A-Z]{1,3}\d{1,3})\b[^\n]{0,80}?FL?(\d{1,3})\s*[-\u2013]\s*FL?(\d{1,3})/gmi;
-  let m;
-  while ((m = regex.exec(text)) !== null) {
-    // attempt to extract nodes between awy and FL
-    const snippet = m[0];
-    const awy = m[1];
-    // attempt to find "X-Y" between awy and FL
-    const mid = snippet.replace(awy, '').replace(m[2], '').replace(m[3], '');
-    const nodePair = mid.match(/([A-Z0-9'()\/]+)\s*-\s*([A-Z0-9'()\/]+)/i);
-    let fromNode = nodePair ? nodePair[1] : '';
-    let toNode = nodePair ? nodePair[2] : '';
-    const normalized = normalizeSegment(awy, fromNode, toNode, m[2], m[3]);
-    if (normalized) out.push(normalized);
-  }
-  return Array.from(new Set(out.filter(Boolean)));
-}
-
-/* ===========================
-   Orchestrator
-   =========================== */
-
-function parseNotam(rawText) {
-  const text = (rawText || '').toString().replace(/\r\n/g, '\n');
-  if (!text.trim()) return { success: false, error: 'empty input' };
-
-  // 1) Try O/P:
-  let segments = extractFromOPBlock(text);
-  // 2) If none, try E) block extraction
-  if (segments.length === 0) segments = extractSegmentsFromE(text);
-  // 3) Generic fallback scanning
-  if (segments.length === 0) segments = extractSegmentsGeneric(text);
-
-  // If still nothing, try to interpret lines like "FLW ATS RTE SEGMENTS CLSD: L321 KUNKI-OBRAN FL000-FL500, L604 BRN-DANAD FL000-FL500 ..."
-  if (segments.length === 0) {
-    const colonListMatch = text.match(/(?:FLW\s+ATS\s+RTE\s+SEGMENTS\s+CLSD|ATS RTE SEGMENTS CLSD|SEGMENT OF ATS RTE CLSD)[\s\S]*?:\s*([\s\S]+)/i);
-    if (colonListMatch) {
-      const tail = colonListMatch[1].split(/O\/P:|E\)|$|\. \s*/)[0];
-      // split by comma or semicolon or newline
-      const bits = tail.split(/[,;\n]/).map(s => s.trim()).filter(Boolean);
-      for (let b of bits) {
-        const m = b.match(/([A-Z]\d{1,4}|[A-Z]{1,3}\d{1,3})\s+([A-Z0-9'()\/\-\s]+?)\s+FL?(\d{1,3})\s*[-\u2013]\s*FL?(\d{1,3})/i);
-        if (m) segments.push(normalizeSegment(m[1], ...m[2].split(/\s*-\s*/), m[3], m[4]));
-      }
-    }
-  }
-
-  segments = Array.from(new Set(segments.filter(Boolean)));
-
-  if (segments.length > 0) {
-    return { success: true, segments };
-  }
-
-  // Nothing found -> save to memory to learn later
-  const entry = {
-    input: rawText,
-    expected_output: null,
-    created_at: new Date().toISOString()
-  };
-  addMemoryEntry(entry);
-  return { success: false, saved_to_memory: true, memory_entry: entry };
-}
-
-/* ===========================
-   CLI + demo runner
-   =========================== */
-
-function printUsage() {
-  console.log('Usage:');
-  console.log('  node offline_notam_parser.js parse "<NOTAM TEXT>"');
-  console.log('  node offline_notam_parser.js parse-file path/to/textfile.txt');
-  console.log('  node offline_notam_parser.js add-memory "<NOTAM TEXT>" \'<JSON_ARRAY_OF_EXPECTED_OUTPUTS>\'');
-  console.log('  node offline_notam_parser.js show-memory');
-  console.log('');
-  console.log('Example:');
-  console.log('  node offline_notam_parser.js parse "Q0381/25 NOTAM... O/P: L736 NEDRA-GOMED FL045-FL130"');
-}
-
-function cli() {
-  const argv = process.argv.slice(2);
-  if (!argv.length) {
-    // run demo on several NOTAM examples (provided by user)
-    demo();
-    return;
-  }
-
-  const cmd = argv[0];
-  if (cmd === 'parse') {
-    const input = argv[1] || '';
-    const res = parseNotam(input);
-    console.log(JSON.stringify(res, null, 2));
-    return;
-  }
-  if (cmd === 'parse-file') {
-    const p = argv[1];
-    if (!p || !fs.existsSync(p)) {
-      console.error('file missing');
-      return;
-    }
-    const txt = fs.readFileSync(p, 'utf8');
-    console.log(JSON.stringify(parseNotam(txt), null, 2));
-    return;
-  }
-  if (cmd === 'add-memory') {
-    const raw = argv[1] || '';
-    const json = argv[2] || '[]';
-    let expected;
-    try { expected = JSON.parse(json); } catch(e) { console.error('expected JSON array invalid'); return; }
-    const entry = {
-      input: raw,
-      expected_output: expected,
-      created_at: new Date().toISOString()
-    };
-    addMemoryEntry(entry);
-    console.log('added to memory:', JSON.stringify(entry, null, 2));
-    return;
-  }
-  if (cmd === 'show-memory') {
-    console.log(JSON.stringify(readMemory(), null, 2));
-    return;
-  }
-  printUsage();
-}
-
-/* ===========================
-   Demo - run on user's sample NOTAMs
-   =========================== */
-
-function demo() {
-  console.log('Running demo on sample NOTAMs (your examples) ...\n');
-
-  const samples = [
-`Q0381/25 NOTAMNQ)UMKK/QARLC/IV/NBO/E/045/130/5435N02024E028
-A)UMKK B)2508120600 C)2508152200
-D)12-15 0600-2200
-E)FLW ATS RTE SEGMENTS CLSD:L736 NEDRA-GOMED FL045-FL130N5 KALININGRAD/KHRABROVO VORDME(KRD)-GITOV FL045-FL130.
-O/P: L736 NEDRA-GOMED FL045-FL130N5 KRD-GITOV FL045-FL130.`,
-
-`A2625/25 NOTAMNQ)ZLHW/QARLT/IV/NBO/E/000/341/3938N09334E069
-A)ZLHW B)2508120100 C)2508120600
-E)SEGMENT TUSLI - DUNHUANG VOR'DNH' OF ATS RTE W187 CLSD AT 10,400M AND BELOW.FROM GND TO FL341
-O/P: W187 TUSLI-DNH FL000-FL341`,
-
-`A0310/25 NOTAMNQ)HECC/QARLC/IV/NBO/E/000/500/3028N02837E122
-A)HECC B)2508180800 C)2508181030
-E)THE FLW ATS RTE CLSD DUE TO MIL EXERAWY L321 KUNKI/OBRAN,AWY L604 BRN/DANAD,AWY L613 IMREK/MMA...
-O/P: L321 KUNKI-OBRAN FL000-FL500L604 BRN-DANAD FL000-FL500L613 IMREK-MMA FL000-FL500`,
-
-// a tricky one lacking O/P block
-`A2709/25 NOTAMNQ)ZLHW/QARLT/IV/NBO/E/000/157/3920N09412E091
-A)ZLHW B)2508180130 C)2508180830
-E)FLW SEGMENT OF ATS RTE CLSD AT 4,800M AND BELOW:
-1.W187:TUSLI - KARVI
-2.W112:TUSLI - VIKUP
-FROM FL000 TO FL157`,
-
-// one that should probably be saved to memory due to odd formatting
-`THIS IS A WEIRD ONE: NO FL INFO, JUST "CHECK ROUTES"`,
-
-  ];
-
-  samples.forEach((s, idx) => {
-    console.log('--- Sample', idx+1);
-    const out = parseNotam(s);
-    console.log(JSON.stringify(out, null, 2), '\n');
-  });
-
-  console.log('Demo finished. If parser could not extract segments, that NOTAM was saved to memory.json for later teaching.');
-}
-
-/* ===========================
-   Run CLI
-   =========================== */
-if (require.main === module) {
-  cli();
-}
-
-/* ===========================
-   Exports for programmatic use
-   =========================== */
-module.exports = {
-  parseNotam,
-  addMemoryEntry, // internal helper for advanced uses
-  readMemory,
-  writeMemory,
-};
+# ---------------------------
+# CLI demo / file mode
+# ---------------------------
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python notam_parser.py <notam_file.txt>")
+        print("Runs demo on built-in sample if no file provided.\n")
+        demo = """A3088/25 NOTAMN
+Q)LTAA/QANLC/IV/NBO/E/000/300/4216N03553E088
+A)LTAA B)2507190700 C)2507201700
+D)0700-1700
+E)RNAV ROUTES-SEGMENTS AFFECTED DURING EXERCISE AS FOLLOWS:
+1.AWY L/UL851 KUGOS-OLUPO SEGMENT CLSD.
+2.AWY M/UM859 OSDIP-KARDE SEGMENT CLSD.
+3.AWY N/UN644 SIN-KARDE SEGMENT CLSD.
+4.AWY UM860 SIN-CRM SEGMENT CLSD.
+5.AWY M/UM10 OLUPO-GOKPA SEGMENT CLSD. 
+VERTICAL LIMITS: SFC-30000FT AMSL"""
+        res = parse_notam(demo)
+        print("Plain outputs:")
+        for l in res["outputs"]:
+            print(l)
+        print("\nJSON:")
+        print(json.dumps(res, indent=2))
+        sys.exit(0)
+    fn = sys.argv[1]
+    with open(fn, 'r', encoding='utf-8') as f:
+        txt = f.read()
+    r = parse_notam(txt)
+    for line in r["outputs"]:
+        print(line)
+    outfn = fn + ".parsed.json"
+    with open(outfn, 'w', encoding='utf-8') as wf:
+        json.dump(r, wf, indent=2)
+    print(f"\nJSON written to {outfn}")
